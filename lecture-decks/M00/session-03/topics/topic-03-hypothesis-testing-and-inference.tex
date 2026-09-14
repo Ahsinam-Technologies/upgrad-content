@@ -1,0 +1,183 @@
+\documentclass[../m00-session-03.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{03}{Hypothesis Testing \& Decision Making}{Statistical Foundations \& Probability}
+\TopicDivider{03}{Hypothesis Testing \& Decision Making}{The skeptic's null hypothesis, p-values, Type I/II errors, and statistical power.}
+
+% -----------------------------------------------------------------------------
+% Frame 1: Cognitive Objectives
+% -----------------------------------------------------------------------------
+\begin{frame}{Cognitive Objectives}
+  \begin{LearningObjectives}{By the end of this topic, learners will be able to:}
+    \begin{itemize}\setlength{\itemsep}{0.28em}
+      \item \textbf{Formulate testable hypotheses} with the Null Hypothesis ($H_0$) as the conservative presumption of zero effect.
+      \item \textbf{Interpret $p$-values accurately} as the probability of observing data at least as extreme under $H_0$ (not the probability that $H_0$ is true).
+      \item \textbf{Balance Type I ($\alpha$) vs Type II ($\beta$) errors} to maximize statistical power ($1-\beta$) in production A/B tests.
+      \item \textbf{Execute non-parametric permutation tests} in NumPy to evaluate metrics without asymptotic normality assumptions.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 2: The Socratic Hook (The A/B Test Skeptic's Dilemma)
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The A/B Testing Dilemma}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The Business Question: Real or Luck?}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item Control ($A$): 2,000 users $\to$ 2.1\% conversion.
+        \item Treatment ($B$): 2,000 users $\to$ 2.5\% conversion (+0.4\% lift).
+        \item Product Manager wants to ship immediately!
+        \item \textcolor{UpGradRed}{\textbf{Socratic Probe:}} Is this +0.4\% lift a real behavioral change or just random coin-flip variance?
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The "Aha!" Discovery: Proof by Contradiction}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.18em}\small
+        \item \textbf{Null Hypothesis ($H_0$):} Treatment has \textbf{zero effect} ($\mu_B - \mu_A = 0$). Presumption of innocence!
+        \item \textbf{Simulate the Null Universe:} What is the distribution of differences if Variant B is completely useless?
+        \item \textbf{$p$-Value:} How rarely would random noise generate a lift $\ge +0.4\%$?
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{$p$-value measures surprise under the null hypothesis.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 3: Hero Visualization: The Null Distribution & Critical Alpha Tail
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Null Distribution \& Rejection Region}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.88]
+      \begin{axis}[
+        width=11.5cm,
+        height=4.6cm,
+        axis lines=left,
+        xlabel={\small Standardized Test Statistic $z$},
+        ylabel={\small Density},
+        ymin=0, ymax=0.45,
+        xmin=-3.5, xmax=3.5,
+        grid=both,
+        grid style={line width=.2pt,draw=UpGradRule},
+        xtick={-3, -1.96, 0, 1.96, 2.45, 3},
+        xticklabels={$-3$, $-z_{\text{crit}}$, $0$, $+z_{\text{crit}}$, $z^*$, $+3$},
+      ]
+        % Null Gaussian curve N(0, 1)
+        \addplot[smooth, thick, UpGradNight, domain=-3.5:3.5, samples=70] {exp(-x^2/2) / sqrt(2*pi)};
+        
+        % Right Critical Rejection Region alpha/2 = 0.025 (x >= 1.96)
+        \addplot[smooth, ultra thick, UpGradRed, fill=UpGradRed!25, domain=1.96:3.5, samples=30] {exp(-x^2/2) / sqrt(2*pi)} \closedcycle;
+        
+        % Left Critical Rejection Region alpha/2 = 0.025 (x <= -1.96)
+        \addplot[smooth, ultra thick, UpGradRed, fill=UpGradRed!25, domain=-3.5:-1.96, samples=30] {exp(-x^2/2) / sqrt(2*pi)} \closedcycle;
+        
+        % Observed Test Statistic z* = 2.45
+        \draw[ultra thick, AWSOrange, dashed] (axis cs:2.45, 0) -- (axis cs:2.45, 0.35);
+        \node[font=\tiny\bfseries\color{AWSOrange},above] at (axis cs:2.45, 0.35) {Observed $z^* = 2.45$};
+        
+        % p-value label
+        \node[font=\tiny\bfseries\color{UpGradRed}] at (axis cs:2.7, 0.08) {$p\text{-value}$};
+        \node[font=\tiny\bfseries\color{UpGradSlate}] at (axis cs:0, 0.20) {Fail to Reject $H_0$ ($1-\alpha = 95\%$)};
+      \end{axis}
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.20cm}
+  \TakeawayBanner{Reject $H_0$ if observed $z^*$ falls into the critical $\alpha=0.05$ extreme tail.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 4: Hero Visualization: The 2x2 Decision Matrix
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Type I vs Type II Decision Matrix}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.88,every node/.style={transform shape}]
+      % Column Headers (Ground Truth)
+      \node[font=\small\bfseries\color{UpGradNight}] at (2.2, 3.2) {Ground Truth: $H_0$ is TRUE (No Effect)};
+      \node[font=\small\bfseries\color{UpGradNight}] at (7.0, 3.2) {Ground Truth: $H_0$ is FALSE (Real Effect)};
+
+      % Row Headers (Decision)
+      \node[rotate=90,font=\small\bfseries\color{UpGradNight}] at (-0.4, 1.8) {Decision: Retain $H_0$};
+      \node[rotate=90,font=\small\bfseries\color{UpGradNight}] at (-0.4, -0.4) {Decision: Reject $H_0$};
+
+      % Cell (1,1): True Negative
+      \node[draw=AWSEmerald,line width=1.2pt,fill=AWSEmerald!12,rounded corners=2mm,minimum width=4.2cm,minimum height=2.0cm] at (2.2, 1.8) {%
+        \begin{minipage}{3.8cm}
+          \centering\sffamily
+          {\small\bfseries\color{AWSEmerald}Correct Decision}\par\vspace{0.06cm}
+          {\scriptsize\textbf{Confidence Level:} $1 - \alpha = 95\%$}\par
+          {\tiny Did not ship useless code.}
+        \end{minipage}
+      };
+
+      % Cell (1,2): False Negative (Type II)
+      \node[draw=AWSOrange,line width=1.2pt,fill=AWSOrange!12,rounded corners=2mm,minimum width=4.2cm,minimum height=2.0cm] at (7.0, 1.8) {%
+        \begin{minipage}{3.8cm}
+          \centering\sffamily
+          {\small\bfseries\color{AWSOrange}Type II Error ($\beta$)}\par\vspace{0.06cm}
+          {\scriptsize\textbf{False Negative Rate}}\par
+          {\tiny Missed opportunity: discarded working feature.}
+        \end{minipage}
+      };
+
+      % Cell (2,1): False Positive (Type I)
+      \node[draw=UpGradRed,line width=1.2pt,fill=UpGradRed!12,rounded corners=2mm,minimum width=4.2cm,minimum height=2.0cm] at (2.2, -0.4) {%
+        \begin{minipage}{3.8cm}
+          \centering\sffamily
+          {\small\bfseries\color{UpGradRed}Type I Error ($\alpha$)}\par\vspace{0.06cm}
+          {\scriptsize\textbf{False Positive (Significance)}}\par
+          {\tiny Shipped placebo change thinking it worked.}
+        \end{minipage}
+      };
+
+      % Cell (2,2): True Positive (Statistical Power)
+      \node[draw=AWSBlue,line width=1.2pt,fill=AWSBlue!12,rounded corners=2mm,minimum width=4.2cm,minimum height=2.0cm] at (7.0, -0.4) {%
+        \begin{minipage}{3.8cm}
+          \centering\sffamily
+          {\small\bfseries\color{AWSBlue}Statistical Power ($1-\beta$)}\par\vspace{0.06cm}
+          {\scriptsize\textbf{Correct Discovery}}\par
+          {\tiny Successfully detected real business lift.}
+        \end{minipage}
+      };
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 5: Production Checkpoint: Permutation A/B Testing Engine
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Checkpoint: Non-Parametric Permutation Testing}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradNight}Permutation Test Algorithm}\par\vspace{0.06cm}
+      \begin{enumerate}\setlength{\itemsep}{0.14em}\small
+        \item Compute observed metric delta $\Delta^* = \bar{B} - \bar{A}$.
+        \item Pool all observations ($N_A + N_B$).
+        \item Reshuffle group labels $K = 10,000$ times.
+        \item Fraction of shuffled trials with $\Delta_{\text{null}} \ge \Delta^*$ gives the exact empirical $p$-value.
+      \end{enumerate}
+      \vspace{0.04cm}
+      \TakeawayBanner{Permutation tests eliminate all parametric assumptions.}
+    \end{column}
+    \hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}NumPy Implementation}\par\vspace{0.04cm}
+\begin{CodeBlock}{Python}
+import numpy as np
+
+def permutation_test(ctrl, trt, k=10_000):
+    obs_diff = np.mean(trt) - np.mean(ctrl)
+    pooled = np.concatenate([ctrl, trt])
+    n = len(ctrl)
+    null_diffs = np.empty(k)
+    for i in range(k):
+        np.random.shuffle(pooled)
+        null_diffs[i] = np.mean(pooled[n:]) - np.mean(pooled[:n])
+    return float(np.mean(null_diffs >= obs_diff))
+\end{CodeBlock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

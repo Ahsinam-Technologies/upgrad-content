@@ -1,0 +1,85 @@
+% -----------------------------------------------------------------------------
+% hash_and_stream_diagrams.tex — Parameterized TikZ macros for Block 2
+% -----------------------------------------------------------------------------
+
+% 1. Hash Table Direct Address Bucket Mapping
+\newcommand{\DrawHashTableEngine}[1]{%
+  % #1: mode = 1 (Normal O(1) jump), 2 (Mutation Breakdown & Lost Key)
+  \begin{tikzpicture}[font=\ttfamily\scriptsize, scale=0.72, transform shape]
+    % Key Input
+    \node[draw=UpGradNight,fill=white,rounded corners=1.5mm,thick,minimum width=2.4cm,minimum height=0.8cm] (key) at (0,2.4) {
+      \textbf{"user\_99"}
+    };
+    
+    % Hash Function Box
+    \node[draw=AWSBlue,fill=AWSBlue!10,rounded corners=1.5mm,thick,minimum width=2.6cm,minimum height=0.8cm] (hfunc) at (3.2,2.4) {
+      \textbf{hash() \% 8}
+    };
+    \draw[upgrad/flow,thick] (key) -- (hfunc);
+    
+    % Bucket Array
+    \draw[draw=UpGradSlate!40,fill=UpGradMist,rounded corners=1.5mm] (6.2,0) rectangle (10.2,4.8);
+    \node[anchor=north west,font=\tiny\bfseries\color{UpGradSlate}] at (6.4,4.6) {BUCKET ARRAY (RAM)};
+    
+    \foreach \i/\val in {0/empty, 1/empty, 2/empty, 3/empty, {4/{"user\_99": 101}}, 5/empty, 6/empty, 7/empty} {
+      \ifnum\i=4
+        \node[draw=AWSEmerald,fill=AWSEmerald!15,rounded corners=1mm,thick,minimum width=3.4cm,minimum height=0.45cm,font=\tiny] (b\i) at (8.2, 4.2 - \i*0.52) {
+          \textbf{[\i]\enspace\val}
+        };
+      \else
+        \node[draw=UpGradRule,fill=white,rounded corners=1mm,minimum width=3.4cm,minimum height=0.45cm,font=\tiny\color{UpGradSlate}] (b\i) at (8.2, 4.2 - \i*0.52) {
+          [\i]\enspace\val
+        };
+      \fi
+    }
+    
+    \ifnum#1=1
+      \draw[upgrad/pointer,AWSEmerald,very thick] (hfunc.east) -- (b4.west);
+      \node[anchor=north west,font=\tiny\bfseries\color{AWSEmerald}] at (0.2,0.6) {Direct Index Jump: CPU reaches Bucket [4] in O(1) 45ns!};
+    \else
+      \draw[upgrad/pointer,UpGradRed,very thick,dashed] (hfunc.east) -- (b7.west);
+      \node[anchor=north west,font=\tiny\bfseries\color{UpGradRedDark}] at (0.2,0.6) {Mutation Hazard: Mutated key hashes to [7] (empty), original lost in [4]!};
+    \fi
+  \end{tikzpicture}%
+}
+
+% 2. Generator Stream Suspension Lifecycle
+\newcommand{\DrawGeneratorLifecycle}{%
+  \begin{tikzpicture}[font=\ttfamily\scriptsize, scale=0.62, transform shape]
+    % Function Invocation
+    \node[upgrad/service,minimum width=2.4cm] (init) at (0,2) {\textbf{stream = gen()}\\ \tiny Returns PyGenObject};
+    \node[upgrad/data,minimum width=2.4cm] (call) at (3.2,2) {\textbf{next(stream)}\\ \tiny Resumes execution};
+    \node[upgrad/accent,minimum width=2.4cm] (yield) at (6.4,2) {\textbf{yield item}\\ \tiny Suspends \& freezes stack};
+    \node[upgrad/model,minimum width=2.4cm] (stop) at (9.6,2) {\textbf{return}\\ \tiny Raises StopIteration};
+    
+    \draw[upgrad/flow] (init) -- (call);
+    \draw[upgrad/flow] (call) -- (yield);
+    \draw[upgrad/flow] (yield) -- (stop);
+    \draw[upgrad/flow red,dashed] (yield.south) to[bend left=30] node[below,font=\tiny\color{UpGradRedDark}] {Loop resumes next() without stack destroy} (call.south);
+  \end{tikzpicture}%
+}
+
+% 3. Closure Cell Object Reference
+\newcommand{\DrawClosureCellDiagram}{%
+  \begin{tikzpicture}[font=\ttfamily\scriptsize, scale=0.78, transform shape]
+    % Outer Function Scope
+    \draw[draw=UpGradSlate!40,fill=UpGradCode,rounded corners=2mm] (0,0) rectangle (4.2,3.2);
+    \node[anchor=north west,font=\tiny\bfseries\color{UpGradNight}] at (0.2,3.0) {Outer: make\_multiplier()};
+    \node[draw=UpGradNight,fill=white,rounded corners=1mm] (fvar) at (2.1,2.0) {factor = 3};
+    
+    % Heap Cell Object
+    \node[draw=AWSBlue,fill=AWSBlue!15,rounded corners=1.5mm,thick,minimum width=2.6cm,minimum height=1.0cm,align=center] (cell) at (6.5,2.0) {
+      \textbf{PyCellObject}\\ \tiny stores pointer to int(3)
+    };
+    \draw[upgrad/pointer,AWSBlue,thick] (fvar.east) -- (cell.west);
+    
+    % Inner Returned Function
+    \draw[draw=AWSEmerald,fill=UpGradMist,rounded corners=2mm,thick] (0.2,0.3) rectangle (3.8,1.3);
+    \node[font=\tiny\bfseries\color{AWSEmerald}] at (2.0,0.8) {triple = multiply};
+    \draw[upgrad/pointer,AWSEmerald,thick] (3.8,0.8) to[bend right=15] (cell.south);
+    
+    \node[anchor=north west,font=\tiny\color{UpGradSlate},align=left] at (4.8,0.8) {
+      \textbf{triple.\_\_closure\_\_[0]}\\ references surviving heap Cell!
+    };
+  \end{tikzpicture}%
+}

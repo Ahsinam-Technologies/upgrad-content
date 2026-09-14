@@ -1,0 +1,180 @@
+\documentclass[../m00-session-02.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{03}{Finding Axes of Maximum Truth: Eigen \& SVD}{Applied Linear Algebra via NumPy}
+\TopicDivider{03}{Finding Axes of Maximum Truth: Eigen \& SVD}{Invariant directions under transformation, spectral theorem, and PCA from scratch.}
+
+% -----------------------------------------------------------------------------
+% Frame 1: Cognitive Objectives
+% -----------------------------------------------------------------------------
+\begin{frame}{Cognitive Objectives}
+  \begin{LearningObjectives}{By the end of this topic, learners will be able to:}
+    \begin{itemize}\setlength{\itemsep}{0.28em}
+      \item \textbf{Identify invariant directions} geometrically where linear transformations act as pure scalars ($\mathbf{A}\mathbf{v} = \lambda\mathbf{v}$).
+      \item \textbf{Diagonalize symmetric operators} using the Spectral Theorem on data covariance matrices $\Sigma = \frac{1}{n}\mathbf{X}^T\mathbf{X}$.
+      \item \textbf{Deconstruct SVD geometrically} as a 3-step pipeline: Rotation ($V^T$) $\to$ Scaling ($\Sigma$) $\to$ Rotation ($U$).
+      \item \textbf{Implement PCA from scratch} using Singular Value Decomposition to compress high-dimensional feature spaces.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 2: The Socratic Hook (The 50-Feature Redundancy Dilemma)
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The High-Dimensional Redundancy Dilemma}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The 50-Feature Multicollinearity Curse}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.22em}\small
+        \item Customer transaction dataset contains $d = 50$ numeric columns.
+        \item Many features (e.g., monthly spend, annual income, credit limit) are heavily correlated.
+        \item \textcolor{UpGradRed}{\textbf{Curse of Dimensionality:}} Models overfit, distance metrics degrade, latency escalates.
+        \item \textbf{Challenge:} How do we extract the top 3 orthogonal directions in space that preserve $95\%$ of all data variance?
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The Discovery: Invariant Axes of Variance}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.22em}\small
+        \item Under transformation, most vectors rotate out of their original line of action.
+        \item \textbf{Eigenvectors} never rotate; they only stretch by factor $\lambda$:
+          \[
+          \mathbf{A}\mathbf{v} = \lambda\mathbf{v}
+          \]
+        \item On the data covariance matrix, the top eigenvector points along the line of \textbf{maximum spread / variance}!
+      \end{itemize}
+      \vspace{0.06cm}
+      \TakeawayBanner{Eigenvectors find the natural coordinate system of the data.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 3: Hero Visualization: Eigenvectors as Invariant Directions
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Eigenvectors as Invariant Directions}
+  \VisualExploration[.54]{%
+    \begin{tikzpicture}[scale=0.92,>=stealth,every node/.style={transform shape}]
+      % Axes
+      \draw[->, thick, UpGradSlate!60] (-0.4, 0) -- (5.2, 0) node[right, font=\tiny\sffamily] {$x_1$};
+      \draw[->, thick, UpGradSlate!60] (0, -0.4) -- (0, 3.8) node[above, font=\tiny\sffamily] {$x_2$};
+      
+      % Eigenvector span line (Dashed)
+      \draw[dashed, line width=1.1pt, AWSBlue!70] (-0.3, -0.2) -- (4.8, 3.2) node[above, font=\scriptsize\bfseries\color{AWSBlue}] {$\text{Span}(\mathbf{v}_1)$};
+      
+      % Eigenvector before transformation
+      \coordinate (V) at (1.8, 1.2);
+      \draw[->, line width=2.2pt, AWSBlue] (0, 0) -- (V) node[below right=-1pt, font=\small\bfseries] {$\mathbf{v}_1$};
+      
+      % Eigenvector after transformation (Scaled by lambda=2.2 along same line!)
+      \coordinate (AV) at (3.96, 2.64);
+      \draw[->, line width=2.4pt, UpGradRed] (0, 0) -- (AV) node[above left, font=\small\bfseries] {$\mathbf{A}\mathbf{v}_1 = \lambda_1 \mathbf{v}_1$};
+      
+      % Non-eigenvector x (arbitrary direction)
+      \coordinate (X) at (1.0, 2.5);
+      \draw[->, line width=1.5pt, UpGradSlate] (0, 0) -- (X) node[left, font=\small\bfseries] {$\mathbf{x}$};
+      
+      % Non-eigenvector Ax (Rotates and scales!)
+      \coordinate (AX) at (3.4, 0.8);
+      \draw[->, line width=1.6pt, AWSOrange] (0, 0) -- (AX) node[below right, font=\small\bfseries] {$\mathbf{A}\mathbf{x}$};
+      
+      % Rotation arc for x
+      \draw[->, thick, AWSOrange] (0.7, 1.75) arc (68.2:13.2:0.75);
+      \node[font=\scriptsize\bfseries\color{AWSOrange}] at (1.4, 1.5) {Rotates off span!};
+    \end{tikzpicture}%
+  }{Invariant Directions Under $\mathbf{A}$}{%
+    \begin{itemize}\setlength{\itemsep}{0.25em}
+      \item \textbf{General Vector $\mathbf{x}$:} Multiplied by $\mathbf{A}$, changes both length \textbf{and} direction ($\mathbf{A}\mathbf{x} \nparallel \mathbf{x}$).
+      \item \textbf{Eigenvector $\mathbf{v}$:} Multiplied by $\mathbf{A}$, remains on its original span line ($\mathbf{A}\mathbf{v} \parallel \mathbf{v}$).
+      \item \textbf{Eigenvalue $\lambda$:} The scalar stretch factor along the invariant line.
+      \item \textbf{Spectral Theorem:} Any symmetric matrix $\mathbf{S} = \mathbf{S}^T$ has an orthonormal basis of eigenvectors ($\mathbf{S} = \mathbf{Q}\Lambda\mathbf{Q}^T$).
+    \end{itemize}
+  }
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 4: Hero Visualization: The 3-Step SVD Transformation Pipeline
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: SVD Geometric Decomposition}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.82,every node/.style={transform shape}]
+      % Step 1: Unit Circle in R^n (v1, v2 basis)
+      \begin{scope}[shift={(0,0)}]
+        \node[font=\small\bfseries\color{UpGradNight}] at (0, 2.3) {1. Input Space ($\mathbf{V}^T$)};
+        \draw[thick, UpGradRule!70] (-1.8,0) -- (1.8,0);
+        \draw[thick, UpGradRule!70] (0,-1.8) -- (0,1.8);
+        \draw[thick, AWSBlue, fill=AWSBlue!12] (0,0) circle (1.2cm);
+        \draw[->, line width=1.8pt, UpGradRed] (0,0) -- (1.2,0) node[above right=-2pt, font=\small\bfseries] {$\mathbf{v}_1$};
+        \draw[->, line width=1.8pt, AWSBlue] (0,0) -- (0,1.2) node[above left=-2pt, font=\small\bfseries] {$\mathbf{v}_2$};
+      \end{scope}
+
+      % Arrow 1: Rotate / Align
+      \draw[->, ultra thick, UpGradSlate] (2.0, 0) -- (3.2, 0) node[midway, above=2pt, font=\small\bfseries\color{UpGradNight}] {$\mathbf{V}^T$};
+
+      % Step 2: Singular Value Stretch (Sigma)
+      \begin{scope}[shift={(5.2,0)}]
+        \node[font=\small\bfseries\color{UpGradNight}] at (0, 2.3) {2. Axis Scaling ($\Sigma$)};
+        \draw[thick, UpGradRule!70] (-2.2,0) -- (2.2,0);
+        \draw[thick, UpGradRule!70] (0,-1.8) -- (0,1.8);
+        \draw[thick, AWSOrange, fill=AWSOrange!12] (0,0) ellipse [x radius=1.9cm, y radius=0.7cm];
+        \draw[->, line width=1.8pt, UpGradRed] (0,0) -- (1.9,0) node[below=2pt, font=\small\bfseries] {$\sigma_1 \mathbf{e}_1$};
+        \draw[->, line width=1.8pt, AWSBlue] (0,0) -- (0,0.7) node[left=2pt, font=\small\bfseries] {$\sigma_2 \mathbf{e}_2$};
+      \end{scope}
+
+      % Arrow 2: Rotate into Output Space (U)
+      \draw[->, ultra thick, UpGradSlate] (7.3, 0) -- (8.5, 0) node[midway, above=2pt, font=\small\bfseries\color{UpGradNight}] {$\mathbf{U}$};
+
+      % Step 3: Rotated Ellipse in R^m (u1, u2 basis)
+      \begin{scope}[shift={(10.6,0)}]
+        \node[font=\small\bfseries\color{UpGradNight}] at (0, 2.3) {3. Output Space ($\mathbf{U}$)};
+        \draw[thick, UpGradRule!70] (-2.0,0) -- (2.0,0);
+        \draw[thick, UpGradRule!70] (0,-2.0) -- (0,2.0);
+        \draw[thick, AWSEmerald, fill=AWSEmerald!12, rotate=30] (0,0) ellipse [x radius=1.9cm, y radius=0.7cm];
+        \draw[->, line width=1.8pt, UpGradRed] (0,0) -- ({1.9*cos(30)}, {1.9*sin(30)}) node[above right=-1pt, font=\small\bfseries] {$\sigma_1 \mathbf{u}_1$};
+        \draw[->, line width=1.8pt, AWSBlue] (0,0) -- ({-0.7*sin(30)}, {0.7*cos(30)}) node[above left=-1pt, font=\small\bfseries] {$\sigma_2 \mathbf{u}_2$};
+      \end{scope}
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.10cm}
+  \TakeawayBanner{Every real matrix $\mathbf{X} = \mathbf{U} \Sigma \mathbf{V}^T$: Orthogonal Rotation $\to$ Axis Stretch $\to$ Orthogonal Rotation.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 5: Production Checkpoint: PCA from Scratch via SVD
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Checkpoint: Principal Component Analysis via SVD}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradNight}PCA Mathematical Mechanics}\par\vspace{0.08cm}
+      For zero-centered data $\mathbf{X} \in \mathbb{R}^{N \times d}$:
+      \begin{enumerate}\setlength{\itemsep}{0.20em}\small
+        \item Compute SVD: $\mathbf{X} = \mathbf{U} \Sigma \mathbf{V}^T$.
+        \item Right singular vectors $\mathbf{V} \in \mathbb{R}^{d \times d}$ are the principal loading directions.
+        \item Project to $k$ dimensions: $\mathbf{Z} = \mathbf{X} \mathbf{V}_{:,:k} = \mathbf{U}_{:,:k} \Sigma_{:k,:k}$.
+        \item Explained variance ratio: $\frac{\sigma_i^2}{\sum \sigma_j^2}$.
+      \end{enumerate}
+    \end{column}
+    \hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}NumPy Implementation from Scratch}\par\vspace{0.06cm}
+\begin{CodeBlock}{Python}
+import numpy as np
+
+def pca_from_scratch(X: np.ndarray, k: int):
+    # 1. Center the features (zero mean)
+    X_centered = X - np.mean(X, axis=0)
+    
+    # 2. Economy SVD decomposition
+    U, S, Vt = np.linalg.svd(X_centered, full_matrices=False)
+    
+    # 3. Project data onto top-k components
+    Z = X_centered @ Vt[:k].T  # shape: (N, k)
+    
+    # 4. Compute explained variance ratio
+    explained_var = (S**2) / np.sum(S**2)
+    return Z, Vt[:k], explained_var[:k]
+\end{CodeBlock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

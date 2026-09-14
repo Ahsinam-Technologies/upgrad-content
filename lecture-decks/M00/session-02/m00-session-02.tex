@@ -1,16 +1,19 @@
 \documentclass[aspectratio=169,10pt]{beamer}
 \usepackage{subfiles}
 \usepackage{upgradbeamer}
-\DeckMetadata{M00 Foundations Pre-Module}{Session 02}
-\author{UpGrad Learning Team}
+\DeckMetadata{M00: Foundations of Data Science}{Session 02}
+\author{upGrad Data Science Faculty}
 \date{}
 
 \begin{document}
-\UpGradTitleSlide{Data foundations: from S3 objects to analysable tables}{M00 Session 02}{M00 Foundations Pre-Module}{Session 02}
-\SessionTopicsSlide{
-  \TopicEntry{01}{Give data a readable shape}{Distinguish storage from a trusted, documented data contract.}
-  \TopicEntry{02}{Validate before analysis}{Inspect types, missingness, time and entity keys before transformations begin.}
+\UpGradTitleSlide{Applied Linear Algebra via NumPy}{Spatial Transformations, Data Geometry, and Dimensionality Reduction}{M00: Foundations of Data Science}{Session 02}
+\subfile{topics/topic-01-vectors-spaces-norms}
+\subfile{topics/topic-02-matrices-linear-transformations}
+\subfile{topics/topic-03-eigenvalues-and-svd}
+
+\SessionSummarySlide{
+  \TopicEntry{01}{How Machines ``See'' Data: Vectors \& Norms}{High-dimensional feature space, dot products as projections, and L1 vs L2 geometry.}
+  \TopicEntry{02}{What is a Matrix, Really? Linear Transformations}{Matrices as spatial deformation operators, basis shifts, determinants, and rank.}
+  \TopicEntry{03}{Finding Axes of Maximum Truth: Eigen \& SVD}{Invariant directions under transformation, spectral theorem, and PCA from scratch.}
 }
-\subfile{topics/topic-01-data-contract}
-\subfile{topics/topic-02-validation}
 \end{document}

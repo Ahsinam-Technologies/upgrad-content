@@ -1,0 +1,170 @@
+\documentclass[../m00-session-04.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{01}{The ``Works on My Machine'' Curse: Environments}{Basic Software Engineering Workflows}
+\TopicDivider{01}{The ``Works on My Machine'' Curse: Environments}{Dependency isolation, venv/uv internals, sys.path resolution, and lockfiles.}
+
+% -----------------------------------------------------------------------------
+% Frame 1: Cognitive Objectives
+% -----------------------------------------------------------------------------
+\begin{frame}{Cognitive Objectives}
+  \begin{LearningObjectives}{By the end of this topic, learners will be able to:}
+    \begin{itemize}\setlength{\itemsep}{0.28em}
+      \item \textbf{Diagnose dependency collisions} in global Python \InlineCode{site-packages} and understand \InlineCode{sys.path} resolution.
+      \item \textbf{Inspect virtual environment internals} (isolated binaries, symlinks, \InlineCode{pyvenv.cfg}, and isolated packages).
+      \item \textbf{Author modern packaging specifications} using declarative \InlineCode{pyproject.toml} (PEP 621 / PEP 517).
+      \item \textbf{Enforce zero-drift reproducibility} with deterministic lockfiles (\InlineCode{uv.lock}) in production cloud pipelines.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 2: The Socratic Hook (The Global Site-Packages Disaster)
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Dependency Collision Catastrophe}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The Collision: Global Package Overwrites}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item \textbf{Legacy Model API (Project A):} Requires \InlineCode{pandas==1.5.3} and \InlineCode{numpy<1.24}.
+        \item \textbf{New GenAI Pipeline (Project B):} Requires \InlineCode{pandas>=2.2.0} and \InlineCode{numpy>=1.26}.
+        \item Running \InlineCode{pip install pandas==2.2} globally silently overwrites the files in \InlineCode{/usr/lib/python3.11/site-packages/}.
+        \item \textcolor{UpGradRed}{\textbf{Production Outage:}} Project A's production inference server crashes with \InlineCode{AttributeError}!
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The "Aha!" Discovery: Path Sandboxing}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.18em}\small
+        \item A Virtual Environment is not a VM or container; it is simply a \textbf{directory tree with a redirected \InlineCode{sys.prefix}}!
+        \item CPython checks \InlineCode{pyvenv.cfg} on startup.
+        \item \InlineCode{sys.path} prepends the local \InlineCode{.venv/lib/python/site-packages/} ahead of global directories.
+        \item Multiple isolated environments coexist on the same machine without mutual interference.
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Never execute \InlineCode{pip install} outside an active virtual environment.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 3: Hero Visualization: Virtual Environment Architecture
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Virtual Environment Sandboxing}
+  \VisualExploration[.56]{%
+    \begin{tikzpicture}[scale=0.82,>=stealth,every node/.style={transform shape}]
+      % Global System Level
+      \draw[UpGradRule,thick,fill=UpGradMist] (-3.8,-2.0) rectangle (-1.2,2.0);
+      \node[font=\scriptsize\bfseries\color{UpGradSlate},above] at (-2.5,2.0) {System Python};
+      \node[draw=UpGradSlate,thick,fill=white,rounded corners=1mm,font=\tiny\ttfamily] at (-2.5,1.2) {/usr/bin/python3};
+      \node[draw=UpGradRed,thick,fill=UpGradRed!10,rounded corners=1mm,font=\tiny\ttfamily,align=center] at (-2.5,-0.5) {Global\\site-packages\\(Collisions!)};
+
+      % Venv A
+      \draw[UpGradRule,thick,fill=AWSBlue!10] (0.0,0.3) rectangle (3.8,2.2);
+      \node[font=\scriptsize\bfseries\color{AWSBlue},above] at (1.9,2.2) {Project A (\ttfamily .venv-a)};
+      \node[draw=AWSBlue,thick,fill=white,rounded corners=1mm,font=\tiny\ttfamily] at (1.9,1.5) {python $\to$ pandas 1.5};
+      \node[font=\tiny\color{AWSBlue}] at (1.9,0.7) {Isolated site-packages};
+
+      % Venv B
+      \draw[UpGradRule,thick,fill=AWSEmerald!10] (0.0,-2.0) rectangle (3.8,-0.1);
+      \node[font=\scriptsize\bfseries\color{AWSEmerald},above] at (1.9,-0.1) {Project B (\ttfamily .venv-b)};
+      \node[draw=AWSEmerald,thick,fill=white,rounded corners=1mm,font=\tiny\ttfamily] at (1.9,-0.8) {python $\to$ pandas 2.2};
+      \node[font=\tiny\color{AWSEmerald}] at (1.9,-1.6) {Isolated site-packages};
+
+      % Flow pointers
+      \draw[->,thick,dashed,AWSBlue] (-1.2,1.2) to[out=0,in=180] (0.0,1.5);
+      \draw[->,thick,dashed,AWSEmerald] (-1.2,1.2) to[out=0,in=180] (0.0,-0.8);
+    \end{tikzpicture}%
+  }{How CPython Resolves Imports}{%
+    \begin{itemize}\setlength{\itemsep}{0.25em}
+      \item \textbf{\InlineCode{pyvenv.cfg}:} Defines \InlineCode{home = /usr/bin} and \InlineCode{include-system-site-packages = false}.
+      \item \textbf{\InlineCode{sys.executable}:} Points to the local environment binary \InlineCode{./.venv/bin/python}.
+      \item \textbf{\InlineCode{sys.path} Order:}
+        \begin{enumerate}\scriptsize
+          \item Current Working Directory (\InlineCode{""}).
+          \item Virtualenv \InlineCode{site-packages}.
+          \item Python Standard Library.
+        \end{enumerate}
+    \end{itemize}
+  }
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 4: Hero Visualization: Modern Packaging & Lockfiles
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Modern Packaging \& Lockfile Pipeline}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.82,every node/.style={transform shape}]
+      % Step 1: pyproject.toml
+      \node[draw=UpGradNight,line width=1.2pt,fill=UpGradMist,rounded corners=2mm,inner sep=6pt] (spec) at (0, 0) {%
+        \begin{minipage}{3.4cm}
+          \centering\sffamily
+          {\small\bfseries\color{UpGradNight}\InlineCode{pyproject.toml}}\par\vspace{0.06cm}
+          {\tiny\textbf{Abstract Intent:}}\par
+          {\tiny\ttfamily pandas >= 2.0\\scikit-learn >= 1.4}
+        \end{minipage}
+      };
+
+      % Arrow 1
+      \draw[->, ultra thick, AWSOrange] (2.0, 0) -- (3.4, 0) node[midway, above, font=\tiny\bfseries\color{AWSOrange}] {\InlineCode{uv lock}};
+
+      % Step 2: uv.lock
+      \node[draw=AWSOrange,line width=1.2pt,fill=AWSOrange!10,rounded corners=2mm,inner sep=6pt] (lock) at (5.4, 0) {%
+        \begin{minipage}{3.4cm}
+          \centering\sffamily
+          {\small\bfseries\color{AWSOrange}\InlineCode{uv.lock}}\par\vspace{0.06cm}
+          {\tiny\textbf{Exact Concrete Graph:}}\par
+          {\tiny\ttfamily pandas==2.2.1 (sha256...)\\numpy==1.26.4 (sha256...)}
+        \end{minipage}
+      };
+
+      % Arrow 2
+      \draw[->, ultra thick, AWSEmerald] (7.4, 0) -- (8.8, 0) node[midway, above, font=\tiny\bfseries\color{AWSEmerald}] {\InlineCode{uv sync}};
+
+      % Step 3: Production Environment
+      \node[draw=AWSEmerald,line width=1.2pt,fill=AWSEmerald!10,rounded corners=2mm,inner sep=6pt] (prod) at (10.8, 0) {%
+        \begin{minipage}{3.4cm}
+          \centering\sffamily
+          {\small\bfseries\color{AWSEmerald}Production Environment}\par\vspace{0.06cm}
+          {\tiny\textbf{Zero Drift Execution:}}\par
+          {\tiny 100\% Identical across Local, CI/CD, and AWS Cloud}
+        \end{minipage}
+      };
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.10cm}
+  \TakeawayBanner{Commit \InlineCode{uv.lock} to Git to guarantee bit-for-bit reproducible ML environments.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 5: Production Checkpoint: High-Speed Environment Operations with uv
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Checkpoint: High-Speed Operations with uv}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradNight}Modern Cloud Python Toolchain}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item Written in Rust, \textbf{\InlineCode{uv}} is $10-100\times$ faster than standard \InlineCode{pip} and \InlineCode{virtualenv}.
+        \item Global hardlink caching avoids copying duplicate wheels across projects.
+        \item Replaces \InlineCode{pip}, \InlineCode{pip-tools}, \InlineCode{virtualenv}, \InlineCode{poetry}, and \InlineCode{pyenv}.
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Sub-millisecond dependency synchronization in production.}
+    \end{column}
+    \hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Essential Production Commands}\par\vspace{0.06cm}
+\begin{CodeBlock}{bash}
+# 1. Create lightning-fast virtualenv
+uv venv --python 3.11
+
+# 2. Add dependencies with instant resolution
+uv add pandas numpy scikit-learn
+
+# 3. Deterministic sync from locked graph
+uv sync --frozen
+\end{CodeBlock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

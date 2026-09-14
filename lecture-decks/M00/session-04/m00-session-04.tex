@@ -1,12 +1,19 @@
-% This transparent topic scaffold exists because no approved instructional deck was supplied.
 \documentclass[aspectratio=169,10pt]{beamer}
 \usepackage{subfiles}
 \usepackage{upgradbeamer}
-\DeckMetadata{M00}{Session 04}
-\author{UpGrad Learning Team}
+\DeckMetadata{M00: Foundations of Data Science}{Session 04}
+\author{upGrad Data Science Faculty}
 \date{}
+
 \begin{document}
-\UpGradTitleSlide{M00: Session 04}{Instructional content pending approval}{M00}{Session 04}
-\SessionTopicsSlide{\TopicEntry{01}{Content handoff}{Replace this transparent topic scaffold with reviewed instructional material.}}
-\subfile{topics/topic-01-content-handoff}
+\UpGradTitleSlide{Basic Software Engineering Workflows}{Reproducibility, Isolation, and Production-Grade Code Hygiene}{M00: Foundations of Data Science}{Session 04}
+\subfile{topics/topic-01-virtual-environments-packaging}
+\subfile{topics/topic-02-git-internals-and-workflows}
+\subfile{topics/topic-03-pytest-and-code-quality}
+
+\SessionSummarySlide{
+  \TopicEntry{01}{The ``Works on My Machine'' Curse: Environments}{Dependency isolation, venv/uv internals, sys.path resolution, and lockfiles.}
+  \TopicEntry{02}{Time Travel \& Parallel Realities: Git Internals}{Directed Acyclic Graphs, SHA-1 snapshots, branching, and merge conflict surgery.}
+  \TopicEntry{03}{Silent Failure Prevention: Pytest \& Quality}{Deterministic unit testing, test fixtures, parametrization, and ruff linting.}
+}
 \end{document}

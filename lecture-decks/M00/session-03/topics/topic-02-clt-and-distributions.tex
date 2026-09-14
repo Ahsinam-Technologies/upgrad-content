@@ -1,0 +1,168 @@
+\documentclass[../m00-session-03.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{02}{Order from Chaos: The Central Limit Theorem}{Statistical Foundations \& Probability}
+\TopicDivider{02}{Order from Chaos: The Central Limit Theorem}{Why bell curves rule the universe, Law of Large Numbers, and standard errors.}
+
+% -----------------------------------------------------------------------------
+% Frame 1: Cognitive Objectives
+% -----------------------------------------------------------------------------
+\begin{frame}{Cognitive Objectives}
+  \begin{LearningObjectives}{By the end of this topic, learners will be able to:}
+    \begin{itemize}\setlength{\itemsep}{0.28em}
+      \item \textbf{Explain the universality of the Central Limit Theorem (CLT)} across arbitrary non-normal parent distributions.
+      \item \textbf{Quantify sampling uncertainty} via the Standard Error formula $\text{SE} = \frac{\sigma}{\sqrt{N}}$ and variance collapse.
+      \item \textbf{Navigate the Distribution Zoo} (Bernoulli, Poisson, Exponential, Normal) to select proper likelihood models for data.
+      \item \textbf{Run high-speed Monte Carlo simulations} in NumPy to empirically validate limit laws.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 2: The Socratic Hook (The Law of Large Numbers & Variance Collapse)
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Variance Collapse Mystery}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The Wild Individual vs The Calm Average}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item Individual server response times $X_i \sim \text{Exponential}(\lambda)$ are heavily skewed with extreme latency spikes.
+        \item Measure the mean latency $\bar{X}_N = \frac{1}{N}\sum_{i=1}^N X_i$ across batches of $N = 100$ requests.
+        \item \textcolor{UpGradRed}{\textbf{Socratic Probe:}} Why does the distribution of batch means become perfectly symmetrical and narrow?
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The "Aha!" Discovery: $\frac{1}{\sqrt{N}}$ Scaling}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.18em}\small
+        \item \textbf{Expected Value:} $\mathbb{E}[\bar{X}_N] = \mu$ (Unbiased center).
+        \item \textbf{Variance Collapse:}
+          \[
+          \text{Var}(\bar{X}_N) = \text{Var}\left(\frac{1}{N}\sum X_i\right) = \frac{1}{N^2} \sum \sigma^2 = \frac{\sigma^2}{N}
+          \]
+        \item \textbf{Standard Error:} $\text{SE} = \frac{\sigma}{\sqrt{N}}$.
+        \item Independent random fluctuations cancel each other out!
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Quadrupling sample size cuts estimation error in half.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 3: Hero Visualization: Central Limit Theorem Convergence
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: CLT Convergence from Uniform Noise}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.72,every node/.style={transform shape}]
+      % Panel 1: N = 1 (Flat Uniform)
+      \begin{scope}[shift={(0,0)}]
+        \node[font=\small\bfseries\color{UpGradNight}] at (1.5, 2.7) {$N = 1$ (Flat Uniform)};
+        \draw[thick, UpGradRule!70] (-0.3,0) -- (3.3,0);
+        \draw[thick, UpGradRule!70] (0,-0.3) -- (0,2.4);
+        \fill[UpGradRed!20] (0.5,0) rectangle (2.5,1.5);
+        \draw[ultra thick, UpGradRed] (0.5,0) -- (0.5,1.5) -- (2.5,1.5) -- (2.5,0);
+        \node[font=\tiny\bfseries\color{UpGradSlate}] at (1.5,-0.4) {Skew / Flat};
+      \end{scope}
+
+      % Panel 2: N = 2 (Triangle)
+      \begin{scope}[shift={(4.2,0)}]
+        \node[font=\small\bfseries\color{UpGradNight}] at (1.5, 2.7) {$N = 2$ (Triangle)};
+        \draw[thick, UpGradRule!70] (-0.3,0) -- (3.3,0);
+        \draw[thick, UpGradRule!70] (0,-0.3) -- (0,2.4);
+        \fill[AWSOrange!20] (0.2,0) -- (1.5,1.8) -- (2.8,0) -- cycle;
+        \draw[ultra thick, AWSOrange] (0.2,0) -- (1.5,1.8) -- (2.8,0);
+        \node[font=\tiny\bfseries\color{UpGradSlate}] at (1.5,-0.4) {Central Tendency};
+      \end{scope}
+
+      % Panel 3: N = 5 (Smooth Bell)
+      \begin{scope}[shift={(8.4,0)}]
+        \node[font=\small\bfseries\color{UpGradNight}] at (1.5, 2.7) {$N = 5$ (Proto-Bell)};
+        \draw[thick, UpGradRule!70] (-0.3,0) -- (3.3,0);
+        \draw[thick, UpGradRule!70] (0,-0.3) -- (0,2.4);
+        \draw[ultra thick, AWSBlue, fill=AWSBlue!20] plot[domain=0.2:2.8, samples=30] 
+          (\x, {2.0 * exp(-1.8*(\x-1.5)^2)});
+        \node[font=\tiny\bfseries\color{UpGradSlate}] at (1.5,-0.4) {Curvature Appears};
+      \end{scope}
+
+      % Panel 4: N = 30 (Gaussian Standard)
+      \begin{scope}[shift={(12.6,0)}]
+        \node[font=\small\bfseries\color{UpGradNight}] at (1.5, 2.7) {$N = 30$ (Gaussian)};
+        \draw[thick, UpGradRule!70] (-0.3,0) -- (3.3,0);
+        \draw[thick, UpGradRule!70] (0,-0.3) -- (0,2.4);
+        \draw[ultra thick, AWSEmerald, fill=AWSEmerald!20] plot[domain=0.5:2.5, samples=30] 
+          (\x, {2.3 * exp(-6.0*(\x-1.5)^2)});
+        \node[font=\tiny\bfseries\color{AWSEmerald}] at (1.5,-0.4) {$\mathcal{N}(\mu, \sigma^2/N)$};
+      \end{scope}
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.10cm}
+  \TakeawayBanner{Summing independent variables inevitably produces Gaussian distribution geometry.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 4: Hero Visualization: The Data Science Distribution Zoo
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: The Distribution Selection Matrix}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Discrete Counting Processes}\par\vspace{0.06cm}
+      \begin{itemize}\setlength{\itemsep}{0.22em}\small
+        \item \textbf{Bernoulli($p$):} Single binary coin flip / click conversion ($k \in \{0, 1\}$).
+        \item \textbf{Binomial($n, p$):} Number of successes in $n$ independent trials ($k \in \{0, \dots, n\}$).
+        \item \textbf{Poisson($\lambda$):} Rare count events per fixed time window (e.g., website server errors/min). Mean = Variance = $\lambda$.
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSBlue}Continuous Physical Quantities}\par\vspace{0.06cm}
+      \begin{itemize}\setlength{\itemsep}{0.22em}\small
+        \item \textbf{Uniform($a, b$):} Maximum uncertainty / random initialization in neural nets.
+        \item \textbf{Exponential($\lambda$):} Waiting time between Poisson events (memoryless queue latency).
+        \item \textbf{Gaussian $\mathcal{N}(\mu, \sigma^2)$}: Aggregated sensor noise, measurement errors, regression residuals.
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Match your ML loss function to the data generation distribution.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 5: Production Checkpoint: Vectorized Monte Carlo Verification
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Checkpoint: Empirical Monte Carlo CLT Engine}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradNight}Monte Carlo Simulation Mechanics}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item Draw $M = 100,000$ independent sample batches from heavy-tailed Pareto / Exponential distribution.
+        \item Each batch contains $N = 50$ observations.
+        \item Compute batch sample means across columns in one vectorized operation.
+        \item Verify that kurtosis and skewness converge to Gaussian ($0.0$).
+      \end{itemize}
+    \end{column}
+    \hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Vectorized NumPy Simulation}\par\vspace{0.06cm}
+\begin{CodeBlock}{Python}
+import numpy as np
+
+def simulate_clt(
+    num_experiments=100_000, 
+    sample_size=50
+) -> tuple[float, float]:
+    # 1. Draw from heavily-skewed Exponential
+    raw_samples = np.random.exponential(
+        scale=2.0, 
+        size=(num_experiments, sample_size)
+    )
+    # 2. Vectorized batch means: (100000,)
+    sample_means = np.mean(raw_samples, axis=1)
+    
+    # 3. Empirical Mean & Standard Error
+    return float(np.mean(sample_means)), float(np.std(sample_means))
+\end{CodeBlock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

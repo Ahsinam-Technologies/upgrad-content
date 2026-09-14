@@ -1,0 +1,95 @@
+% =============================================================================
+% 00_opening.tex — Slides S01-001 to S01-004
+% Session Opening, The Dynamic Typing Paradox, North-Star Question & Roadmap
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-001
+% Narrative Role: Title / Cover
+% Cognitive Objective: Establish session identity, module context, and program standards.
+% Plan Source: slide_plan.md / S01-001
+% -----------------------------------------------------------------------------
+\UpGradTitleSlide{Python Programming Foundations}{Mastering the Python Virtual Machine, Memory Semantics \& Vectorized Mechanics}{M00: Foundations of Data Science}{Session 01}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-002
+% Narrative Role: Hook / Contrast
+% Cognitive Objective: Confront the learner with the fundamental contradiction between compiled typed languages and Python.
+% Plan Source: slide_plan.md / S01-002
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Dynamic Typing Paradox}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}C++ / Java (Statically Typed Boxes)}\par\vspace{0.08cm}
+      \begin{HighlightedCodeBlock}{C++}{2}
+int x = 42;
+x = "hello"; // FATAL COMPILATION ERROR!
+      \end{HighlightedCodeBlock}
+      \vspace{0.08cm}
+      \begin{tcolorbox}[enhanced,arc=1mm,boxrule=.4pt,colback=UpGradRed!10,colframe=UpGradRed,left=2mm,right=2mm,top=1.5mm,bottom=1.5mm]
+        {\scriptsize\bfseries\color{UpGradRedDark}Compile Error:}\enspace{\tiny\ttfamily cannot convert 'const char*' to 'int'}
+      \end{tcolorbox}
+      \vspace{0.04cm}
+      {\scriptsize\color{UpGradSlate}Variables are fixed, statically typed physical memory slots.}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSBlue}Python (Dynamic Pointer Rebinding)}\par\vspace{0.08cm}
+      \begin{HighlightedCodeBlock}{Python}{2,3}
+x = 42
+x = "hello"     # Executes seamlessly!
+x = [1, 2, 3]   # No compiler complaints!
+      \end{HighlightedCodeBlock}
+      \vspace{0.08cm}
+      \begin{tcolorbox}[enhanced,arc=1mm,boxrule=.4pt,colback=AWSEmerald!10,colframe=AWSEmerald,left=2mm,right=2mm,top=1.5mm,bottom=1.5mm]
+        {\scriptsize\bfseries\color{AWSEmerald}Runtime Status:}\enspace{\tiny\bfseries\color{AWSEmerald}EXECUTES SEAMLESSLY (Exit Code 0)}
+      \end{tcolorbox}
+      \vspace{0.04cm}
+      {\scriptsize\color{UpGradSlate}Why does Python permit one variable to effortlessly change types?}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{In Python, variables are not data boxes—they are named memory pointers.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-003
+% Narrative Role: North-Star Hook
+% Cognitive Objective: Frame the overarching question that unifies memory semantics, closures, and NumPy performance.
+% Plan Source: slide_plan.md / S01-003
+% -----------------------------------------------------------------------------
+\begin{frame}{The Session North-Star Question}
+  \begin{center}
+    \vspace{0.05cm}
+    \begin{tcolorbox}[enhanced,arc=2mm,boxrule=.6pt,colback=UpGradMist,colframe=UpGradRule,
+      borderline west={3.5pt}{0pt}{UpGradRed},left=4.5mm,right=4.5mm,top=3.5mm,bottom=3.5mm,width=0.96\linewidth]
+      {\UpGradDisplayFont\fontsize{12}{16}\selectfont\bfseries\color{UpGradNight}
+        “How can Python let the same variable appear to become an integer, a collection, or even a function wrapper, and what does that dynamic flexibility cost us when scaling numerical computations in pure Python vs NumPy?”
+      }
+    \end{tcolorbox}
+  \end{center}
+  \vspace{0.15cm}
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.31\textwidth}
+      \StatCard{UpGradRed}{Block 1}{Pointer Semantics}{Stack names \& heap PyObjects}
+    \end{column}
+    \begin{column}{0.31\textwidth}
+      \StatCard{AWSBlue}{Block 2}{Hash Tables \& Streams}{O(1) lookups \& lazy generators}
+    \end{column}
+    \begin{column}{0.31\textwidth}
+      \StatCard{AWSEmerald}{Block 3}{Vectorized SIMD}{C-arrays, strides \& broadcasting}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-004
+% Narrative Role: Roadmap / Transition
+% Cognitive Objective: Provide clear structural anchors for the 180-minute journey.
+% Plan Source: slide_plan.md / S01-004
+% -----------------------------------------------------------------------------
+\SessionAgendaSlide{
+  \BlockEntry{01}{The Object Pointer Mental Model \& Memory Semantics}{Stack pointers vs heap allocations, PyObject anatomy, in-place mutation, default argument leakage, and shallow vs deep copies.}
+  \BlockEntry{02}{Data Structures, Lazy Generators \& Practical Decorators}{Hash table direct indexing, why mutable keys fail, O(1) memory streams with yield, first-class functions, and robust decorators with @wraps.}
+  \BlockEntry{03}{The CPython Speed Wall \& NumPy's Breakthrough}{3 CPU bottlenecks of pure Python loops, contiguous C-memory layout, SIMD vectorization, strides math, and zero-memory broadcasting.}
+}

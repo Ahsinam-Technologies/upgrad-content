@@ -1,0 +1,184 @@
+\documentclass[../m00-session-04.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{03}{Silent Failure Prevention: Pytest \& Quality}{Basic Software Engineering Workflows}
+\TopicDivider{03}{Silent Failure Prevention: Pytest \& Quality}{Deterministic unit testing, test fixtures, parametrization, and ruff linting.}
+
+% -----------------------------------------------------------------------------
+% Frame 1: Cognitive Objectives
+% -----------------------------------------------------------------------------
+\begin{frame}{Cognitive Objectives}
+  \begin{LearningObjectives}{By the end of this topic, learners will be able to:}
+    \begin{itemize}\setlength{\itemsep}{0.28em}
+      \item \textbf{Prevent silent data corruption} in ML feature pipelines using deterministic unit tests.
+      \item \textbf{Structure modular test fixtures} and manage setup/teardown lifecycles using dependency injection.
+      \item \textbf{Scale test coverage systematically} with \InlineCode{@pytest.mark.parametrize} across critical edge cases.
+      \item \textbf{Automate code hygiene} using ultra-fast static linters (\InlineCode{ruff}) and type checkers (\InlineCode{mypy}).
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 2: The Socratic Hook (The Silent Data Corruption Catastrophe)
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Silent Failure Disaster}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The Hazard: Code Runs, Data Dies}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item A feature normalization function contains an off-by-one division error or silently fills missing values with $0.0$.
+        \item The script exits with exit code 0 without raising any exceptions!
+        \item Model trains on corrupted features and deploys to production.
+        \item \textcolor{UpGradRed}{\textbf{Business Impact:}} Millions in mispriced loans before anyone notices!
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The "Aha!" Discovery: Executable Contracts}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.18em}\small
+        \item Unit tests act as **executable specifications** that verify data transformations across known invariants.
+        \item Test for shape preservation, non-negativity, mathematical bounds, and null rejection.
+        \item Defensive assertions catch drift before weights are fitted.
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Crashing early is a feature; silent data corruption is a disaster.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 3: Hero Visualization: Pytest Fixture Lifecycle
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Fixture Lifecycle \& Injection}
+  \VisualExploration[.56]{%
+    \begin{tikzpicture}[scale=0.82,>=stealth,every node/.style={transform shape}]
+      % Fixture Box
+      \draw[UpGradRule,thick,fill=AWSBlue!10,rounded corners=2mm] (-3.8,-1.8) rectangle (-0.4,1.8);
+      \node[font=\scriptsize\bfseries\color{AWSBlue},above] at (-2.1,1.8) {\InlineCode{@pytest.fixture}};
+      
+      \node[draw=AWSBlue,thick,fill=white,rounded corners=1mm,font=\tiny\ttfamily] (setup) at (-2.1,1.0) {1. Setup: Load Data};
+      \node[draw=AWSOrange,thick,fill=AWSOrange!15,rounded corners=1mm,font=\tiny\bfseries\ttfamily] (yield_node) at (-2.1,0.0) {yield dataset};
+      \node[draw=UpGradSlate,thick,fill=white,rounded corners=1mm,font=\tiny\ttfamily] (teardown) at (-2.1,-1.0) {3. Teardown / Close};
+      
+      \draw[->,thick] (setup) -- (yield_node);
+      \draw[->,thick] (yield_node) -- (teardown);
+
+      % Test Functions
+      \node[draw=AWSEmerald,line width=1.1pt,fill=AWSEmerald!10,rounded corners=1.5mm,inner sep=4pt] (t1) at (2.4,0.9) {%
+        \begin{tabular}{c}
+          \scriptsize\bfseries\color{AWSEmerald}\ttfamily test\_shape(dataset)\\
+          \tiny assert dataset.shape == (100, 4)
+        \end{tabular}
+      };
+      
+      \node[draw=AWSEmerald,line width=1.1pt,fill=AWSEmerald!10,rounded corners=1.5mm,inner sep=4pt] (t2) at (2.4,-0.9) {%
+        \begin{tabular}{c}
+          \scriptsize\bfseries\color{AWSEmerald}\ttfamily test\_nulls(dataset)\\
+          \tiny assert not dataset.isna().any()
+        \end{tabular}
+      };
+
+      % Dependency Injection Arrows
+      \draw[->,ultra thick,AWSEmerald] (yield_node.east) to[out=20,in=180] (t1.west);
+      \draw[->,ultra thick,AWSEmerald] (yield_node.east) to[out=-20,in=180] (t2.west);
+    \end{tikzpicture}%
+  }{Dependency Injection Mechanics}{%
+    \begin{itemize}\setlength{\itemsep}{0.25em}
+      \item \textbf{Auto-Wiring:} Pytest passes fixture return values into test functions whose parameter names match the fixture name.
+      \item \textbf{Deterministic Isolation:} Each test function receives a fresh copy of the resource.
+      \item \textbf{Scopes:} \InlineCode{function} (default), \InlineCode{module} (once per file), \InlineCode{session} (once per test run).
+    \end{itemize}
+  }
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 4: Hero Visualization: CI/CD Automated Quality Gate
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Modern CI/CD Quality Gate Pipeline}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.80,every node/.style={transform shape}]
+      % Stage 1: Git Push
+      \node[draw=UpGradNight,line width=1.2pt,fill=UpGradMist,rounded corners=2mm,inner sep=5pt] (git) at (0, 0) {%
+        \begin{minipage}{2.6cm}
+          \centering\sffamily
+          {\small\bfseries\color{UpGradNight}1. Git Push}\par\vspace{0.04cm}
+          {\tiny Branch commit}
+        \end{minipage}
+      };
+
+      % Arrow 1
+      \draw[->, ultra thick, UpGradSlate] (1.5, 0) -- (2.5, 0);
+
+      % Stage 2: Ruff Linter
+      \node[draw=AWSBlue,line width=1.2pt,fill=AWSBlue!10,rounded corners=2mm,inner sep=5pt] (ruff) at (4.0, 0) {%
+        \begin{minipage}{2.6cm}
+          \centering\sffamily
+          {\small\bfseries\color{AWSBlue}2. \InlineCode{ruff}}\par\vspace{0.04cm}
+          {\tiny Lint \& Format\\(12ms)}
+        \end{minipage}
+      };
+
+      % Arrow 2
+      \draw[->, ultra thick, UpGradSlate] (5.5, 0) -- (6.5, 0);
+
+      % Stage 3: Mypy Types
+      \node[draw=AWSOrange,line width=1.2pt,fill=AWSOrange!10,rounded corners=2mm,inner sep=5pt] (mypy) at (8.0, 0) {%
+        \begin{minipage}{2.6cm}
+          \centering\sffamily
+          {\small\bfseries\color{AWSOrange}3. \InlineCode{mypy}}\par\vspace{0.04cm}
+          {\tiny Type Checker\\(No \InlineCode{Any} drift)}
+        \end{minipage}
+      };
+
+      % Arrow 3
+      \draw[->, ultra thick, UpGradSlate] (9.5, 0) -- (10.5, 0);
+
+      % Stage 4: Pytest Suite
+      \node[draw=AWSEmerald,line width=1.2pt,fill=AWSEmerald!10,rounded corners=2mm,inner sep=5pt] (test) at (12.0, 0) {%
+        \begin{minipage}{2.6cm}
+          \centering\sffamily
+          {\small\bfseries\color{AWSEmerald}4. \InlineCode{pytest}}\par\vspace{0.04cm}
+          {\tiny Automated Tests\\(100\% passing)}
+        \end{minipage}
+      };
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.10cm}
+  \TakeawayBanner{Automated pre-commit hooks and CI pipelines stop defective code before it reaches production.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 5: Production Checkpoint: Industrial Parametrized Pytest Suite
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Checkpoint: Parametrized Test Suite}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradNight}Parametrization Invariants}\par\vspace{0.06cm}
+      \begin{itemize}\setlength{\itemsep}{0.18em}\small
+        \item Automatically executes the same test across multiple input/output tuples.
+        \item Tests nominal inputs alongside zero vectors, empty matrices, and NaN edge cases.
+        \item Generates individual test reports for each parameterized test case.
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Edge case testing eliminates production surprise failures.}
+    \end{column}
+    \hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Parametrized Test Code}\par\vspace{0.04cm}
+\begin{CodeBlock}{Python}
+import pytest
+import numpy as np
+
+@pytest.mark.parametrize("vec, expected_norm", [
+    (np.array([3.0, 4.0]), 5.0),
+    (np.array([0.0, 0.0]), 0.0),
+    (np.array([1.0, 1.0, 1.0]), np.sqrt(3)),
+])
+def test_vector_norm_calculation(vec, expected_norm):
+    result = np.linalg.norm(vec)
+    assert np.isclose(result, expected_norm, atol=1e-6)
+\end{CodeBlock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

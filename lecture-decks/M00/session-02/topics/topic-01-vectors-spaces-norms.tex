@@ -1,0 +1,218 @@
+\documentclass[../m00-session-02.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{01}{How Machines ``See'' Data: Vectors \& Norms}{Applied Linear Algebra via NumPy}
+\TopicDivider{01}{How Machines ``See'' Data: Vectors \& Norms}{High-dimensional feature space, dot products as projections, and L1 vs L2 geometry.}
+
+% -----------------------------------------------------------------------------
+% Frame 1: Cognitive Objectives
+% -----------------------------------------------------------------------------
+\begin{frame}{Cognitive Objectives}
+  \begin{LearningObjectives}{By the end of this topic, learners will be able to:}
+    \begin{itemize}\setlength{\itemsep}{0.28em}
+      \item \textbf{Represent multi-modal entities} (text embeddings, customer profiles, tensors) as directional arrows in $\mathbb{R}^d$.
+      \item \textbf{Deconstruct dot products} visually as orthogonal shadow projections and angular similarity operators.
+      \item \textbf{Derive geometric sparsity} by contrasting $L_1$ (diamond / Lasso) vs $L_2$ (hypersphere / Ridge) constraint topologies.
+      \item \textbf{Vectorize distance computations} in NumPy avoiding Python loops for high-throughput batch similarity.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 2: The Socratic Hook (Euclidean Distance vs Cosine Similarity)
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The High-Dimensional Similarity Dilemma}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The Magnitude Trap: Euclidean Distance}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.22em}\small
+        \item Two users purchase identical products in identical ratios.
+        \item User A: Wholesale distributor (volume = 10,000 units).
+        \item User B: Individual consumer (volume = 2 units).
+        \item Euclidean distance $d(\mathbf{u}, \mathbf{v}) = \|\mathbf{u} - \mathbf{v}\|_2$ is \textbf{huge}!
+        \item \textcolor{UpGradRed}{\textbf{Failure:}} Euclidean distance confuses \textbf{scale (volume)} with \textbf{preference (direction)}.
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The Geometric Discovery: Directional Alignment}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.22em}\small
+        \item Isolate the angle $\theta$ between vectors in $\mathbb{R}^d$.
+        \item Vectors pointing in the same direction have $\cos\theta = 1.0$, regardless of their individual lengths.
+        \item Normalizing vectors projects them onto the unit hypersphere $\mathbb{S}^{d-1}$.
+        \item \textcolor{AWSEmerald}{\textbf{Solution:}} Cosine similarity captures pure behavioral preference invariant to volume.
+      \end{itemize}
+      \vspace{0.08cm}
+      \TakeawayBanner{Normalize feature vectors when magnitude is uninformative.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 3: Hero Visualization: Dot Product as Shadow Projection
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Dot Product as Shadow Projection}
+  \VisualExploration[.56]{%
+    \begin{tikzpicture}[scale=0.92,>=stealth,every node/.style={transform shape}]
+      % Background grid
+      \draw[step=1cm, UpGradRule!60, very thin] (-0.3, -0.3) grid (5.8, 3.8);
+      
+      % Coordinate Axes
+      \draw[->, thick, UpGradSlate] (-0.3, 0) -- (5.8, 0) node[right, font=\tiny\sffamily] {Feature $x_1$};
+      \draw[->, thick, UpGradSlate] (0, -0.3) -- (0, 3.8) node[above, font=\tiny\sffamily] {Feature $x_2$};
+      
+      % Origin
+      \coordinate (O) at (0, 0);
+      
+      % Vector v (Base direction)
+      \coordinate (V) at (5.0, 1.4);
+      \draw[->, ultra thick, AWSBlue] (O) -- (V) node[right, font=\scriptsize\bfseries\sffamily] {$\mathbf{v}$ (Target)};
+      
+      % Vector u (Source vector)
+      \coordinate (U) at (2.0, 3.2);
+      \draw[->, ultra thick, UpGradRed] (O) -- (U) node[above left, font=\scriptsize\bfseries\sffamily] {$\mathbf{u}$ (Query)};
+      
+      % Orthogonal projection calculation
+      % V = (5.0, 1.4), ||V||^2 = 25 + 1.96 = 26.96
+      % U = (2.0, 3.2), U.V = 2.0*5.0 + 3.2*1.4 = 10 + 4.48 = 14.48
+      % scalar = 14.48 / 26.96 = 0.5371
+      % P = 0.5371 * (5.0, 1.4) = (2.685, 0.752)
+      \coordinate (P) at (2.685, 0.752);
+      
+      % Perpendicular drop line (dashed)
+      \draw[dashed, thick, UpGradNight!80] (U) -- (P);
+      
+      % Right angle symbol at P
+      \draw[thick, UpGradNight!80] ($(P)!0.22cm!(U)$) -- ($(P)!0.22cm!(U) + ($(P)!0.22cm!(O)-(P)$)$) -- ($(P)!0.22cm!(O)$);
+      
+      % Shadow Projection Vector (along v)
+      \draw[->, line width=2.4pt, AWSOrange] (O) -- (P) node[midway, below right=1pt, font=\tiny\bfseries\sffamily, fill=white, inner sep=1pt] {$\text{proj}_{\mathbf{v}}\mathbf{u}$};
+      
+      % Angle theta arc
+      \draw[thick, UpGradNight] (0.8, 0.224) arc (15.6:58.0:0.8);
+      \node at (1.05, 0.52) [font=\scriptsize\bfseries\sffamily] {$\theta$};
+    \end{tikzpicture}%
+  }{The Geometric Duality}{%
+    \begin{itemize}\setlength{\itemsep}{0.25em}
+      \item \textbf{Algebraic Definition:} $\mathbf{u} \cdot \mathbf{v} = \sum_{i=1}^d u_i v_i = \mathbf{u}^T \mathbf{v}$.
+      \item \textbf{Geometric Definition:} $\mathbf{u} \cdot \mathbf{v} = \|\mathbf{u}\|_2 \|\mathbf{v}\|_2 \cos\theta$.
+      \item \textbf{Orthogonal Shadow:} The length of the shadow that $\mathbf{u}$ casts onto the span of $\mathbf{v}$ is:
+        \[
+        \|\text{proj}_{\mathbf{v}}\mathbf{u}\| = \|\mathbf{u}\|_2 \cos\theta = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{v}\|_2}
+        \]
+      \item $\mathbf{u} \perp \mathbf{v} \iff \mathbf{u} \cdot \mathbf{v} = 0$ (Zero shadow / zero mutual information).
+    \end{itemize}
+  }
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 4: Hero Visualization: L1 Diamond vs L2 Circle Regularization
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: $L_1$ Diamond vs $L_2$ Circle Geometry}
+  \begin{columns}[T,onlytextwidth]
+    % Left Panel: L2 Ridge
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        {\small\bfseries\color{AWSBlue}$L_2$ Ridge: Smooth Hypersphere}\par\vspace{0.04cm}
+        \begin{tikzpicture}[scale=0.72]
+          % Axes
+          \draw[->, thick, UpGradSlate!60] (-0.4, 2) -- (4.4, 2) node[right, font=\tiny\sffamily] {$w_1$};
+          \draw[->, thick, UpGradSlate!60] (2, -0.4) -- (2, 4.2) node[above, font=\tiny\sffamily] {$w_2$};
+          
+          % L2 Circle
+          \draw[fill=AWSBlue!15, draw=AWSBlue, thick] (2, 2) circle (1.2cm);
+          \node[font=\tiny\bfseries\sffamily, text=AWSBlue] at (2, 1.0) {$\|\mathbf{w}\|_2^2 \le C$};
+          
+          % Unconstrained optimum w*
+          \coordinate (OptL2) at (4.0, 3.4);
+          \fill[UpGradRed] (OptL2) circle (2pt) node[right, font=\tiny\bfseries\sffamily] {$\mathbf{w}^*$};
+          
+          % Loss contours
+          \draw[thick, UpGradRed!40] (OptL2) ellipse [x radius=0.6cm, y radius=0.35cm, rotate=30];
+          \draw[thick, UpGradRed!70] (OptL2) ellipse [x radius=1.2cm, y radius=0.7cm, rotate=30];
+          \draw[thick, UpGradRed, line width=1.1pt] (OptL2) ellipse [x radius=1.75cm, y radius=1.05cm, rotate=30];
+          
+          % Tangency
+          \coordinate (TanL2) at (2.95, 2.75);
+          \fill[UpGradNight] (TanL2) circle (2.2pt) node[above right=-2pt, font=\tiny\bfseries\sffamily] {$\mathbf{w}_{L2}$};
+        \end{tikzpicture}
+      \end{center}
+      \vspace{-0.15cm}
+      {\scriptsize\color{UpGradSlate}\textbf{Mechanism:} Tangency occurs along smooth curved boundary $\implies w_1 \neq 0, w_2 \neq 0$ (Smooth weight shrinkage).}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    % Right Panel: L1 Lasso
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        {\small\bfseries\color{UpGradRed}$L_1$ Lasso: Diamond Sparsity}\par\vspace{0.04cm}
+        \begin{tikzpicture}[scale=0.72]
+          % Axes
+          \draw[->, thick, UpGradSlate!60] (-0.4, 2) -- (4.4, 2) node[right, font=\tiny\sffamily] {$w_1$};
+          \draw[->, thick, UpGradSlate!60] (2, -0.4) -- (2, 4.2) node[above, font=\tiny\sffamily] {$w_2$};
+          
+          % L1 Diamond
+          \draw[fill=UpGradRed!15, draw=UpGradRed, thick] (3.2, 2) -- (2, 3.2) -- (0.8, 2) -- (2, 0.8) -- cycle;
+          \node[font=\tiny\bfseries\sffamily, text=UpGradRed] at (2, 1.0) {$\|\mathbf{w}\|_1 \le C$};
+          
+          % Unconstrained optimum w*
+          \coordinate (OptL1) at (4.0, 3.4);
+          \fill[UpGradRed] (OptL1) circle (2pt) node[right, font=\tiny\bfseries\sffamily] {$\mathbf{w}^*$};
+          
+          % Loss contours
+          \draw[thick, UpGradRed!40] (OptL1) ellipse [x radius=0.6cm, y radius=0.35cm, rotate=30];
+          \draw[thick, UpGradRed!70] (OptL1) ellipse [x radius=1.15cm, y radius=0.68cm, rotate=30];
+          \draw[thick, UpGradRed, line width=1.1pt] (OptL1) ellipse [x radius=1.72cm, y radius=1.02cm, rotate=30];
+          
+          % Tangency at vertex
+          \coordinate (TanL1) at (2, 3.2);
+          \fill[UpGradRed] (TanL1) circle (2.8pt) node[above=2pt, font=\tiny\bfseries\sffamily, fill=white, inner sep=1pt] {$\mathbf{w}_{L1}$ (\textcolor{UpGradRed}{$w_1 = 0$})};
+        \end{tikzpicture}
+      \end{center}
+      \vspace{-0.15cm}
+      {\scriptsize\color{UpGradSlate}\textbf{Mechanism:} Loss ellipse hits the sharp diamond corner on the coordinate axis $\implies$ forces $w_1 = 0$ (\textbf{Exact Feature Selection}).}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 5: Production Vectorized Checkpoint: Cosine Distance at Scale
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Checkpoint: High-Throughput Batch Similarity}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradNight}Vectorized Similarity Matrix}\par\vspace{0.08cm}
+      Given $M$ queries $\mathbf{A} \in \mathbb{R}^{M \times d}$ and $N$ items $\mathbf{B} \in \mathbb{R}^{N \times d}$:
+      \[
+      \mathbf{S}_{M \times N} = \frac{\mathbf{A} \mathbf{B}^T}{\|\mathbf{A}\|_2 \otimes \|\mathbf{B}\|_2^T}
+      \]
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item Single matrix multiplication: $\mathcal{O}(M N d)$ ops.
+        \item BLAS Level 3 cache-blocked execution ($120\times$ faster than nested loops).
+      \end{itemize}
+      \vspace{0.08cm}
+      \TakeawayBanner{Eliminate all Python loops across feature rows.}
+    \end{column}
+    \hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Vectorized Recommendation Engine}\par\vspace{0.06cm}
+\begin{CodeBlock}{Python}
+import numpy as np
+
+def batch_cosine_similarity(
+    A: np.ndarray, B: np.ndarray
+) -> np.ndarray:
+    """Pairwise cosine sim for M x d and N x d."""
+    # Compute dot products: shape (M, N)
+    dot_products = A @ B.T
+    
+    # Compute L2 norms along feature axis
+    norm_A = np.linalg.norm(A, axis=1, keepdims=True) # (M, 1)
+    norm_B = np.linalg.norm(B, axis=1, keepdims=True) # (N, 1)
+    
+    # Outer product broadcast division -> (M, N)
+    return dot_products / (norm_A @ norm_B.T)
+\end{CodeBlock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

@@ -1,18 +1,31 @@
 \documentclass[aspectratio=169,10pt]{beamer}
-\usepackage{subfiles}
 \usepackage{upgradbeamer}
-\DeckMetadata{M00 Foundations Pre-Module}{Session 01}
-\author{UpGrad Learning Team}
+
+% Session Metadata
+\DeckMetadata{M00: Foundations of Data Science}{Session 01: Python Programming Foundations}
+\author{upGrad Data Science Faculty}
 \date{}
 
+% Load Modular Parameterized TikZ Diagrams
+\input{diagrams/pointer_model_diagrams.tex}
+\input{diagrams/hash_and_stream_diagrams.tex}
+\input{diagrams/numpy_engine_diagrams.tex}
+
 \begin{document}
-\UpGradTitleSlide{Foundations: Python, Cloud and a reproducible workspace}{M00 Session 01}{M00 Foundations Pre-Module}{Session 01}
-\SessionTopicsSlide{
-  \TopicEntry{01}{Set the workspace boundary}{Separate the project, credentials, data and documentation from the start.}
-  \TopicEntry{02}{Make the workflow explicit}{Use an environment, version control and clear responsibility boundaries.}
-  \TopicEntry{03}{Apply the boundary}{Use a concise exit prompt to check the learner's mental model.}
-}
-\subfile{topics/topic-01-workspace}
-\subfile{topics/topic-02-workflow}
-\subfile{topics/topic-03-practice}
+
+% Opening & Roadmap (Slides S01-001 to S01-004)
+\input{blocks/00_opening.tex}
+
+% Block 1: The Object Pointer Mental Model & Memory Semantics (Slides S01-005 to S01-026)
+\input{blocks/01_pointer_memory_model.tex}
+
+% Block 2: Data Structures, Lazy Generators & Practical Decorators (Slides S01-027 to S01-047)
+\input{blocks/02_structures_and_meta.tex}
+
+% Block 3: The CPython Speed Wall & NumPy's Breakthrough (Slides S01-048 to S01-066)
+\input{blocks/03_cpython_and_numpy.tex}
+
+% Session Closing, Synthesis & Bridge to Session 02 (Slides S01-067 to S01-070)
+\input{blocks/04_closing.tex}
+
 \end{document}

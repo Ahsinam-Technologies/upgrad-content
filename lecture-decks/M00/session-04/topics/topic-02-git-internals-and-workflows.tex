@@ -1,0 +1,177 @@
+\documentclass[../m00-session-04.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{02}{Time Travel \& Parallel Realities: Git Internals}{Basic Software Engineering Workflows}
+\TopicDivider{02}{Time Travel \& Parallel Realities: Git Internals}{Directed Acyclic Graphs, SHA-1 snapshots, branching, and merge conflict surgery.}
+
+% -----------------------------------------------------------------------------
+% Frame 1: Cognitive Objectives
+% -----------------------------------------------------------------------------
+\begin{frame}{Cognitive Objectives}
+  \begin{LearningObjectives}{By the end of this topic, learners will be able to:}
+    \begin{itemize}\setlength{\itemsep}{0.28em}
+      \item \textbf{Model Git internals} as a content-addressable directed acyclic graph (DAG) of Blobs, Trees, and Commits.
+      \item \textbf{Deconstruct branch pointers} as lightweight 41-byte SHA-1 text files rather than heavy data copies.
+      \item \textbf{Choose between 3-Way Merging and Rebasing} to maintain clear, auditable collaborative commit histories.
+      \item \textbf{Resolve merge conflicts defensively} without losing critical upstream data science code or model weights.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 2: The Socratic Hook (How Git Stores History)
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Mental Model: Diffs vs Snapshots}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The Intuitive Misconception: Delta Diffs}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item Common belief: Git stores a base file plus a series of incremental text diffs ($+10$ lines, $-3$ lines).
+        \item \textcolor{UpGradRed}{\textbf{Flaw:}} Reconstructing a file from 10,000 commits would require slow sequential diff playback.
+        \item How does \InlineCode{git checkout} switch across branches in 2 milliseconds?
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The "Aha!" Discovery: Directed Acyclic Graph}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.18em}\small
+        \item \textbf{Git stores snapshots, not diffs!}
+        \item Every commit points to a complete root \textbf{Tree} snapshot of the entire repository.
+        \item Unchanged files share identical \textbf{Blob} pointers via content-hash deduplication (SHA-1 / SHA-256).
+        \item Branches are merely 41-byte text pointers moving along the commit DAG!
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Git is a content-addressable key-value object database.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 3: Hero Visualization: Git DAG Object Model
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: The Git Object Model (Blobs, Trees, Commits)}
+  \VisualExploration[.56]{%
+    \begin{tikzpicture}[scale=0.82,>=stealth,every node/.style={transform shape}]
+      % Branch Pointer (HEAD -> main)
+      \node[draw=UpGradRed,line width=1.1pt,fill=UpGradRed!10,rounded corners=1mm,font=\tiny\bfseries\ttfamily] (head) at (-2.8,2.2) {HEAD $\to$ main};
+      
+      % Commit Object
+      \node[draw=UpGradNight,line width=1.2pt,fill=UpGradMist,rounded corners=1.5mm,inner sep=4pt] (commit) at (-2.8,0.6) {%
+        \begin{tabular}{c}
+          \scriptsize\bfseries\color{UpGradNight}\ttfamily Commit: c89a3f\\
+          \tiny\color{UpGradSlate}author: Sagar\\
+          \tiny\color{UpGradSlate}parent: 9f12b4
+        \end{tabular}
+      };
+      \draw[->,thick,UpGradRed] (head) -- (commit);
+
+      % Tree Object
+      \node[draw=AWSBlue,line width=1.2pt,fill=AWSBlue!10,rounded corners=1.5mm,inner sep=4pt] (tree) at (0.4,0.6) {%
+        \begin{tabular}{c}
+          \scriptsize\bfseries\color{AWSBlue}\ttfamily Root Tree: 71ba02\\
+          \hline
+          \tiny\ttfamily src/ $\to$ Tree 4a9c\\
+          \tiny\ttfamily README.md $\to$ Blob 8e31
+        \end{tabular}
+      };
+      \draw[->,thick,UpGradNight] (commit) -- (tree);
+
+      % Blobs
+      \node[draw=AWSEmerald,thick,fill=AWSEmerald!15,rounded corners=1mm,font=\tiny\ttfamily] (blob1) at (3.6,1.4) {train.py (Blob 4a9c)};
+      \node[draw=AWSEmerald,thick,fill=AWSEmerald!15,rounded corners=1mm,font=\tiny\ttfamily] (blob2) at (3.6,-0.2) {README.md (Blob 8e31)};
+
+      \draw[->,thick,AWSBlue] (tree.east) to[out=20,in=180] (blob1.west);
+      \draw[->,thick,AWSBlue] (tree.east) to[out=-20,in=180] (blob2.west);
+    \end{tikzpicture}%
+  }{Content-Addressed Storage}{%
+    \begin{itemize}\setlength{\itemsep}{0.25em}
+      \item \textbf{Blob:} Raw binary payload of file contents. File names and permissions are stored in Trees, not Blobs.
+      \item \textbf{Tree:} Directory mapping holding file names, permissions, and hash pointers to child Trees / Blobs.
+      \item \textbf{Commit:} Author metadata, timestamp, commit message, and pointer to parent commit hash.
+    \end{itemize}
+  }
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 4: Hero Visualization: 3-Way Merge vs Rebase
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: 3-Way Merge vs Rebase Topologies}
+  \begin{columns}[T,onlytextwidth]
+    % Left Panel: 3-Way Merge
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        {\small\bfseries\color{AWSBlue}3-Way Merge: Preserves Branch Divergence}\par\vspace{0.04cm}
+        \begin{tikzpicture}[scale=0.74]
+          % Main line
+          \node[circle,draw=UpGradNight,thick,fill=UpGradMist,inner sep=2pt,font=\tiny] (C1) at (0,0) {$C_1$};
+          \node[circle,draw=UpGradNight,thick,fill=UpGradMist,inner sep=2pt,font=\tiny] (C2) at (1.4,0) {$C_2$};
+          \node[circle,draw=UpGradNight,thick,fill=UpGradMist,inner sep=2pt,font=\tiny] (C3) at (2.8,0) {$C_3$};
+          \node[circle,draw=AWSBlue,line width=1.2pt,fill=AWSBlue!20,inner sep=2pt,font=\tiny\bfseries] (M) at (4.4,0) {$M$};
+          
+          % Feature branch
+          \node[circle,draw=AWSOrange,thick,fill=AWSOrange!20,inner sep=2pt,font=\tiny] (F1) at (2.0,1.2) {$F_1$};
+          \node[circle,draw=AWSOrange,thick,fill=AWSOrange!20,inner sep=2pt,font=\tiny] (F2) at (3.2,1.2) {$F_2$};
+          
+          \draw[->,thick] (C1) -- (C2);
+          \draw[->,thick] (C2) -- (C3);
+          \draw[->,thick] (C3) -- (M);
+          \draw[->,thick] (C2) to[out=45,in=180] (F1);
+          \draw[->,thick] (F1) -- (F2);
+          \draw[->,thick,AWSOrange] (F2) to[out=0,in=135] (M);
+        \end{tikzpicture}
+      \end{center}
+      \vspace{-0.15cm}
+      {\scriptsize\color{UpGradSlate}\textbf{Topology:} Non-linear history. Retains exact chronological branching timestamps and diamond merge commit $M$.}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    % Right Panel: Rebase
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        {\small\bfseries\color{AWSEmerald}Rebase: Clean Linear Narrative}\par\vspace{0.04cm}
+        \begin{tikzpicture}[scale=0.74]
+          % Main line + Replayed commits
+          \node[circle,draw=UpGradNight,thick,fill=UpGradMist,inner sep=2pt,font=\tiny] (C1) at (0,0) {$C_1$};
+          \node[circle,draw=UpGradNight,thick,fill=UpGradMist,inner sep=2pt,font=\tiny] (C2) at (1.2,0) {$C_2$};
+          \node[circle,draw=UpGradNight,thick,fill=UpGradMist,inner sep=2pt,font=\tiny] (C3) at (2.4,0) {$C_3$};
+          \node[circle,draw=AWSEmerald,line width=1.1pt,fill=AWSEmerald!20,inner sep=2pt,font=\tiny] (F1p) at (3.6,0) {$F_1'$};
+          \node[circle,draw=AWSEmerald,line width=1.1pt,fill=AWSEmerald!20,inner sep=2pt,font=\tiny] (F2p) at (4.8,0) {$F_2'$};
+          
+          \draw[->,thick] (C1) -- (C2);
+          \draw[->,thick] (C2) -- (C3);
+          \draw[->,thick,AWSEmerald] (C3) -- (F1p);
+          \draw[->,thick,AWSEmerald] (F1p) -- (F2p);
+        \end{tikzpicture}
+      \end{center}
+      \vspace{-0.15cm}
+      {\scriptsize\color{UpGradSlate}\textbf{Topology:} Completely linear DAG. Replays feature commits on top of the latest \InlineCode{main}. Eliminates messy diamond merge clutter.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 5: Production Checkpoint: Reset vs Revert Safety Policy
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Checkpoint: Reset vs Revert Safety Protocol}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Local Sandbox: \InlineCode{git reset}}\par\vspace{0.06cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item \textbf{Action:} Rewinds branch ref to an earlier commit and discards unpushed commits.
+        \item \textbf{Use Case:} Local feature branch before pushing upstream.
+        \item \textcolor{UpGradRed}{\textbf{Golden Rule:}} \textbf{Never} reset commits that have already been pushed to shared remote branches!
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}Shared Remote: \InlineCode{git revert}}\par\vspace{0.06cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item \textbf{Action:} Creates a new forward-moving commit that applies the exact inverse patch of the target commit.
+        \item \textbf{Use Case:} Rolling back broken production deployments without rewriting shared history.
+        \item Preserves DAG integrity for all team collaborators.
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Use \InlineCode{git revert} for shared branches to protect collaboration.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

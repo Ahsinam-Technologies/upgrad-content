@@ -1,0 +1,5 @@
+# Ignore Gemini prompt files
+GEMINI.md
+**/GEMINI.md
+GEMINI*.md
+*.GEMINI.md

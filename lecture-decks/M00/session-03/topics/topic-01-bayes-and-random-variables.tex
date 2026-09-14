@@ -1,0 +1,207 @@
+\documentclass[../m00-session-03.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{01}{The Illusion of Certainty: Bayes' Theorem}{Statistical Foundations \& Probability}
+\TopicDivider{01}{The Illusion of Certainty: Bayes' Theorem}{Rare events, base rate fallacy, conditional probability geometry, and expectation.}
+
+% -----------------------------------------------------------------------------
+% Frame 1: Cognitive Objectives
+% -----------------------------------------------------------------------------
+\begin{frame}{Cognitive Objectives}
+  \begin{LearningObjectives}{By the end of this topic, learners will be able to:}
+    \begin{itemize}\setlength{\itemsep}{0.28em}
+      \item \textbf{Deconstruct the Base Rate Fallacy} in clinical diagnostics, fraud detection, and rare-event anomaly modeling.
+      \item \textbf{Partition probability sample spaces} geometrically using joint, marginal, and conditional frequency trees.
+      \item \textbf{Track belief updates visually} via the Prior $\times$ Likelihood $\to$ Posterior Bayesian engine.
+      \item \textbf{Implement a Bayesian belief updater} in vectorized NumPy for real-time sequential telemetry.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 2: The Socratic Hook (The False Positive Anomaly Paradox)
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Rare Event Paradox}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The Production Dilemma: Fraud Detection}\par\vspace{0.08cm}
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item Base rate of fraudulent transactions: $1\%$ ($P(F) = 0.01$).
+        \item ML Classifier Accuracy: $95\%$ Sensitivity, $95\%$ Specificity ($5\%$ False Positive Rate).
+        \item An alert fires on Transaction \#84920!
+        \item \textcolor{UpGradRed}{\textbf{Socratic Probe:}} What is the probability that this transaction is \textbf{actually fraudulent}?
+        \item \textbf{Intuitive Guess:} ``95\%!'' $\to$ \textcolor{UpGradRed}{\textbf{Completely wrong!}}
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The "Aha!" Discovery: Base Rate Dominance}\par\vspace{0.08cm}
+      Consider 1,000 transactions:
+      \begin{itemize}\setlength{\itemsep}{0.18em}\small
+        \item \textbf{10 Fraudulent:} 9.5 trigger True Alert, 0.5 Missed.
+        \item \textbf{990 Legitimate:} $5\%$ of $990 = \mathbf{49.5}$ trigger \textbf{False Alerts}!
+        \item Total Alerts Fired: $9.5 + 49.5 = \mathbf{59.0}$.
+        \item True Probability: $\frac{9.5}{59.0} \approx \mathbf{16.1\%}$!
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Base rates dominate high-accuracy test outcomes.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 3: Hero Visualization: Frequency Tree Partitioning
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Frequency Tree Partitioning}
+  \VisualExploration[.56]{%
+    \begin{tikzpicture}[scale=0.82,>=stealth,every node/.style={transform shape}]
+      % Root: 1000 Transactions
+      \node[draw=UpGradNight,line width=1.2pt,fill=UpGradMist,rounded corners=2mm,inner sep=5pt] (root) at (0,2.0) {%
+        \bfseries\sffamily\color{UpGradNight} 1,000 Transactions%
+      };
+      
+      % Branches Level 1: Fraud vs Legitimate
+      \node[draw=UpGradRed,line width=1.1pt,fill=UpGradRed!10,rounded corners=1.5mm,inner sep=4pt] (fraud) at (-2.4,0.3) {%
+        \begin{tabular}{c}
+          \scriptsize\bfseries\color{UpGradRed} 10 Fraud (1\%)\\
+        \end{tabular}
+      };
+      \node[draw=AWSBlue,line width=1.1pt,fill=AWSBlue!10,rounded corners=1.5mm,inner sep=4pt] (legit) at (2.4,0.3) {%
+        \begin{tabular}{c}
+          \scriptsize\bfseries\color{AWSBlue} 990 Legitimate (99\%)\\
+        \end{tabular}
+      };
+      
+      \draw[->,thick,UpGradRed] (root.south) -- (fraud.north) node[midway,left,font=\tiny\bfseries] {Base: 1\%};
+      \draw[->,thick,AWSBlue] (root.south) -- (legit.north) node[midway,right,font=\tiny\bfseries] {Base: 99\%};
+      
+      % Branches Level 2: Alerts
+      \node[draw=AWSEmerald,thick,fill=AWSEmerald!15,rounded corners=1mm,inner sep=3pt] (tp) at (-3.4,-1.4) {%
+        \begin{tabular}{c}
+          \tiny\bfseries\color{AWSEmerald} 9.5 Alerts\\
+          \tiny (True Pos)
+        \end{tabular}
+      };
+      \node[draw=UpGradSlate,thick,fill=white,rounded corners=1mm,inner sep=3pt] (fn) at (-1.4,-1.4) {%
+        \begin{tabular}{c}
+          \tiny\color{UpGradSlate} 0.5 Missed\\
+          \tiny (False Neg)
+        \end{tabular}
+      };
+      \node[draw=UpGradRed,line width=1.2pt,fill=UpGradRed!15,rounded corners=1mm,inner sep=3pt] (fp) at (1.4,-1.4) {%
+        \begin{tabular}{c}
+          \tiny\bfseries\color{UpGradRed} 49.5 Alerts\\
+          \tiny\bfseries (False Pos!)
+        \end{tabular}
+      };
+      \node[draw=AWSBlue,thick,fill=white,rounded corners=1mm,inner sep=3pt] (tn) at (3.4,-1.4) {%
+        \begin{tabular}{c}
+          \tiny\color{AWSBlue} 940.5 Clear\\
+          \tiny (True Neg)
+        \end{tabular}
+      };
+      
+      \draw[->,thick,AWSEmerald] (fraud.south) -- (tp.north);
+      \draw[->,thick,UpGradSlate] (fraud.south) -- (fn.north);
+      \draw[->,thick,UpGradRed] (legit.south) -- (fp.north);
+      \draw[->,thick,AWSBlue] (legit.south) -- (tn.north);
+      
+      % Highlight positive alert pool
+      \draw[dashed,thick,AWSOrange,rounded corners=2mm] (-3.8,-2.0) rectangle (1.8,-0.9);
+      \node[font=\tiny\bfseries\color{AWSOrange},below] at (-1.0,-2.0) {Alert Pool = $9.5 + 49.5 = 59.0$};
+    \end{tikzpicture}%
+  }{Bayes' Theorem Formalized}{%
+    \begin{itemize}\setlength{\itemsep}{0.25em}
+      \item \textbf{Bayes' Formula:}
+        \[
+        P(F \mid +) = \frac{P(+ \mid F) P(F)}{P(+ \mid F) P(F) + P(+ \mid \neg F) P(\neg F)}
+        \]
+      \item \textbf{Numerator (True Signal):} $0.95 \times 0.01 = 0.0095$.
+      \item \textbf{Denominator (Total Evidence):} $0.0095 + (0.05 \times 0.99) = 0.0590$.
+      \item \textbf{Posterior Probability:}
+        \[
+        P(F \mid +) = \frac{0.0095}{0.0590} = \mathbf{16.1\%}
+        \]
+    \end{itemize}
+  }
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 4: Hero Visualization: Bayesian Updating Curves
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Prior $\times$ Likelihood $\to$ Posterior}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.90]
+      \begin{axis}[
+        width=11.5cm,
+        height=4.8cm,
+        axis lines=left,
+        xlabel={\small Parameter Hypothesis $\theta$},
+        ylabel={\small Density},
+        ymin=0, ymax=2.8,
+        xmin=0, xmax=1.0,
+        legend pos=north west,
+        legend style={font=\tiny,fill=white,draw=UpGradRule},
+        grid=both,
+        grid style={line width=.2pt,draw=UpGradRule},
+        every axis x label/.style={at={(ticklabel* cs:1.0)},anchor=west},
+        every axis y label/.style={at={(ticklabel* cs:1.0)},anchor=south},
+      ]
+        % Prior Beta(2, 5) -> Peaks around 0.2
+        \addplot[smooth, thick, AWSBlue, domain=0:1, samples=60] {20 * x * (1-x)^4};
+        \addlegendentry{Prior $P(\theta)$: Initial Belief};
+        
+        % Likelihood Function centered at 0.70
+        \addplot[smooth, thick, AWSOrange, dashed, domain=0:1, samples=60] {1.8 * exp(-30*(x-0.70)^2)};
+        \addlegendentry{Likelihood $P(\mathcal{D} \mid \theta)$: Incoming Data};
+        
+        % Posterior -> Sharpened, peak at 0.52
+        \addplot[smooth, ultra thick, UpGradRed, fill=UpGradRed!20, domain=0:1, samples=60] {2.4 * exp(-35*(x-0.52)^2)};
+        \addlegendentry{Posterior $P(\theta \mid \mathcal{D}) \propto \text{Prior} \times \text{Likelihood}$};
+      \end{axis}
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.20cm}
+  \TakeawayBanner{Today's posterior becomes tomorrow's prior in recursive learning systems.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 5: Production Checkpoint: Vectorized Bayesian Update Filter
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Checkpoint: Vectorized Bayesian Filter}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradNight}Sequential Bayesian Inference}\par\vspace{0.08cm}
+      For hypothesis space $\Theta = [\theta_1, \dots, \theta_K]$:
+      \begin{itemize}\setlength{\itemsep}{0.20em}\small
+        \item \textbf{Prior:} $\mathbf{p}_0 \in \mathbb{R}^K$ (Uniform or historical).
+        \item \textbf{Update Rule:}
+          \[
+          \mathbf{p}_{t} = \frac{\mathbf{p}_{t-1} \odot \mathbf{L}(\text{obs} \mid \Theta)}{\sum_{k=1}^K p_{t-1,k} L(\text{obs} \mid \theta_k)}
+          \]
+        \item Exact, closed-form updates without MCMC sampling for discrete parameter spaces.
+      \end{itemize}
+    \end{column}
+    \hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Vectorized NumPy Implementation}\par\vspace{0.06cm}
+\begin{CodeBlock}{Python}
+import numpy as np
+
+class DiscreteBayesianFilter:
+    def __init__(self, hypotheses: np.ndarray):
+        self.hypo = hypotheses
+        # Start with uniform prior
+        self.prior = np.ones_like(hypotheses) / len(hypotheses)
+
+    def update(self, likelihoods: np.ndarray) -> np.ndarray:
+        """likelihoods: P(Data | hypo_k)"""
+        unnormalized = self.prior * likelihoods
+        evidence = np.sum(unnormalized)
+        self.prior = unnormalized / evidence
+        return self.prior
+\end{CodeBlock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

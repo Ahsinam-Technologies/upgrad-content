@@ -1,12 +1,19 @@
-% This transparent topic scaffold exists because no approved instructional deck was supplied.
 \documentclass[aspectratio=169,10pt]{beamer}
 \usepackage{subfiles}
 \usepackage{upgradbeamer}
-\DeckMetadata{M00}{Session 03}
-\author{UpGrad Learning Team}
+\DeckMetadata{M00: Foundations of Data Science}{Session 03}
+\author{upGrad Data Science Faculty}
 \date{}
+
 \begin{document}
-\UpGradTitleSlide{M00: Session 03}{Instructional content pending approval}{M00}{Session 03}
-\SessionTopicsSlide{\TopicEntry{01}{Content handoff}{Replace this transparent topic scaffold with reviewed instructional material.}}
-\subfile{topics/topic-01-content-handoff}
+\UpGradTitleSlide{Statistical Foundations \& Probability}{Reasoning Under Uncertainty, Limit Laws, and Hypothesis Testing}{M00: Foundations of Data Science}{Session 03}
+\subfile{topics/topic-01-bayes-and-random-variables}
+\subfile{topics/topic-02-clt-and-distributions}
+\subfile{topics/topic-03-hypothesis-testing-and-inference}
+
+\SessionSummarySlide{
+  \TopicEntry{01}{The Illusion of Certainty: Bayes' Theorem}{Rare events, base rate fallacy, conditional probability geometry, and expectation.}
+  \TopicEntry{02}{Order from Chaos: The Central Limit Theorem}{Why bell curves rule the universe, Law of Large Numbers, and standard errors.}
+  \TopicEntry{03}{Hypothesis Testing \& Decision Making}{The skeptic's null hypothesis, p-values, Type I/II errors, and statistical power.}
+}
 \end{document}

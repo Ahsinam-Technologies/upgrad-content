@@ -1,0 +1,630 @@
+% =============================================================================
+% 02_structures_and_meta.tex — Slides S01-027 to S01-047
+% Block 2: Data Structures, Lazy Generators & Practical Decorators
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-027
+% Narrative Role: Block Transition
+% Cognitive Objective: Establish Block 2 themes: Hash tables, streaming generators, and function decorators.
+% Plan Source: slide_plan.md / S01-027
+% -----------------------------------------------------------------------------
+\TopicDivider{02}{Data Structures, Generators \& Decorators}{Hash table indexing, O(1) memory streams with yield, and meta-programming with @wraps.}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-028
+% Narrative Role: Benchmark Hook
+% Cognitive Objective: Contrast linear scan time with instant hash table lookup.
+% Plan Source: slide_plan.md / S01-028
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The 120ms vs 45ns Lookup Mystery}
+  \begin{HighlightedCodeBlock}{Python}{2,6}
+# Search for target in 10,000,000 integers:
+target = 9_999_999
+
+# Data Structure A: Python List
+list_ids = list(range(10_000_000))
+# --> 'target in list_ids' takes 120 milliseconds (Linear O(n) Scan)
+
+# Data Structure B: Python Set
+set_ids = set(range(10_000_000))
+# --> 'target in set_ids' takes 45 nanoseconds (Direct Hash O(1) Jump)
+  \end{HighlightedCodeBlock}
+  \vfill
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \StatCard{UpGradRed}{120 ms}{Python List Lookup}{O(n) sequential pointer traversal}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \StatCard{AWSEmerald}{45 ns}{Python Set Lookup}{2,666,000x Speedup via hash table}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-029
+% Narrative Role: Prediction Prompt
+% Cognitive Objective: Test learner understanding of the hashability contract in Python.
+% Plan Source: slide_plan.md / S01-029
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Prediction Task 2: What Can Be a Dictionary Key?}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.54\textwidth}
+      \begin{CodeBlock}{Python}
+d = {}
+
+# Snippet 1: Tuple of Ints
+d[(1, 2)] = "tuple_key"
+
+# Snippet 2: List of Ints
+d[[1, 2]] = "list_key"
+
+# Snippet 3: Tuple containing a List
+d[(1, [2, 3])] = "nested_key"
+      \end{CodeBlock}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \begin{QuestionBox}{Which Assignments Succeed?}
+        \begin{itemize}\setlength{\itemsep}{0.12cm}
+          \item[\textbf{A)}] All 3 succeed seamlessly.
+          \item[\textbf{B)}] 1 succeeds; 2 and 3 crash.
+          \item[\textbf{C)}] 1 and 3 succeed; 2 crashes.
+          \item[\textbf{D)}] None succeed.
+        \end{itemize}
+      \end{QuestionBox}
+      \vspace{0.10cm}
+      {\scriptsize\color{UpGradSlate}What makes a data structure valid as a dictionary key?}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-030
+% Narrative Role: Reveal / Explanation
+% Cognitive Objective: Master the requirement that dict/set keys must implement immutable __hash__() and __eq__().
+% Plan Source: slide_plan.md / S01-030
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Reveal 2: The Hashability Contract}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.52\textwidth}
+      \begin{TerminalWindow}[PYTHON EVALUATION]
+>>> d[(1, 2)] = "ok"         \# SUCCESS (Immutable tuple) \\
+>>> d[[1, 2]] = "err"        \# CRASH: TypeError: unhashable type: 'list' \\
+>>> d[(1, [2, 3])] = "err"   \# CRASH: TypeError: unhashable type: 'list'
+      \end{TerminalWindow}
+      \vspace{0.12cm}
+      \begin{TakeawayBox}{The Hash Contract}
+        \scriptsize
+        An object is hashable if:
+        \begin{enumerate}\setlength{\itemsep}{0.06cm}
+          \item It implements \InlineCode{\_\_hash\_\_()} returning an integer that \textbf{never changes} during its lifetime.
+          \item It implements \InlineCode{\_\_eq\_\_()} for equality testing.
+        \end{enumerate}
+      \end{TakeawayBox}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{ConceptBox}{Why Tuples with Lists Fail}
+        \scriptsize A tuple is only hashable if \textbf{every nested child} is also hashable. Because the inner list is mutable, the entire compound tuple is unhashable.
+      \end{ConceptBox}
+      \vspace{0.08cm}
+      \StatCard{AWSBlue}{Immutable}{Key Invariant}{Keys must never change internal hash}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-031
+% Narrative Role: Mechanistic Diagram
+% Cognitive Objective: Visualize the hash function modulo index mapping mechanism.
+% Plan Source: slide_plan.md / S01-031
+% -----------------------------------------------------------------------------
+\begin{frame}{How Hash Tables Achieve O(1) Lookups}
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.62\textwidth}
+      \centering
+      \DrawHashTableEngine{1}
+    \end{column}
+    \begin{column}{0.35\textwidth}
+      \begin{ConceptBox}{Direct Address Jump}
+        \scriptsize
+        \begin{enumerate}\setlength{\itemsep}{0.08cm}
+          \item Compute \InlineCode{hash(key)}.
+          \item Mask into bucket capacity: \InlineCode{hash \% 8 = 4}.
+          \item CPU jumps directly to Bucket 4 in RAM.
+        \end{enumerate}
+      \end{ConceptBox}
+      \vspace{0.10cm}
+      \StatCard{AWSEmerald}{O(1)}{Time Complexity}{Zero scanning of other items}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-032
+% Narrative Role: Counter-Example / Failure Mode
+% Cognitive Objective: Understand what would happen if Python allowed lists as dictionary keys.
+% Plan Source: slide_plan.md / S01-032
+% -----------------------------------------------------------------------------
+\begin{frame}{Why Mutable Keys Break Hash Tables: Bucket Chaos}
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.62\textwidth}
+      \centering
+      \DrawHashTableEngine{2}
+    \end{column}
+    \begin{column}{0.35\textwidth}
+      \begin{WarningBox}{Silent Data Loss Trap}
+        \scriptsize
+        If lists could be keys:
+        \begin{itemize}\setlength{\itemsep}{0.08cm}
+          \item Modifying \InlineCode{k.append(9)} changes its hash modulo from 4 to 7.
+          \item Looking up \InlineCode{d[k]} inspects Bucket 7 (empty!).
+          \item The entry is permanently lost in Bucket 4 as a phantom memory leak.
+        \end{itemize}
+      \end{WarningBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{Python forbids mutable keys to protect hash table invariants and prevent silent data corruption.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-033
+% Narrative Role: Formal Theory / Reference
+% Cognitive Objective: Compare algorithmic complexity across list, deque, set, and dict.
+% Plan Source: slide_plan.md / S01-033
+% -----------------------------------------------------------------------------
+\begin{frame}{Big-O Complexity Matrix of Python Collections}
+  \footnotesize
+  \begin{UpGradTable}{>{\bfseries\color{AWSSquid}}p{.24\linewidth} p{.16\linewidth} p{.22\linewidth} p{.16\linewidth} X}
+    \TableHeaderRow \TableHead{Operation} & \TableHead{list} & \TableHead{collections.deque} & \TableHead{set} & \TableHead{dict} \\
+    Index Access (\InlineCode{a[i]}) & \color{AWSEmerald}\bfseries O(1) & \color{UpGradRed}\bfseries O(n) & N/A & \color{AWSEmerald}\bfseries O(1) (Key) \\
+    Search (\InlineCode{x in c}) & \color{UpGradRed}\bfseries O(n) & \color{UpGradRed}\bfseries O(n) & \color{AWSEmerald}\bfseries O(1) avg & \color{AWSEmerald}\bfseries O(1) avg \\
+    Append (Right) & \color{AWSEmerald}\bfseries O(1) amort. & \color{AWSEmerald}\bfseries O(1) & \color{AWSEmerald}\bfseries O(1) (add) & \color{AWSEmerald}\bfseries O(1) \\
+    Prepend (Left) & \color{UpGradRed}\bfseries O(n) (Shifts!) & \color{AWSEmerald}\bfseries O(1) (appendleft) & \color{AWSEmerald}\bfseries O(1) & \color{AWSEmerald}\bfseries O(1) \\
+    Delete by Value & \color{UpGradRed}\bfseries O(n) & \color{UpGradRed}\bfseries O(n) & \color{AWSEmerald}\bfseries O(1) & \color{AWSEmerald}\bfseries O(1) \\
+  \end{UpGradTable}
+  \vfill
+  \TakeawayBanner{Use \InlineCode{deque} for fast bidirectional queues; use \InlineCode{set}/\InlineCode{dict} for instant lookups.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-034
+% Narrative Role: Problem Setup / Memory Graph
+% Cognitive Objective: Understand why eager collection building crashes on large datasets.
+% Plan Source: slide_plan.md / S01-034
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Memory Wall: Eager List Materialization}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.52\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{2}
+# Eager List Comprehension:
+squares = [x * 2 for x in range(10_000_000)]
+# Allocates 10,000,000 distinct PyLongObjects
+# simultaneously into RAM!
+      \end{HighlightedCodeBlock}
+      \vspace{0.10cm}
+      \StatCard{UpGradRed}{450 MB RAM}{Eager Materialization}{Risk of Out-of-Memory OS crash}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \begin{WarningBox}{The OOM Crash Threat}
+        \scriptsize
+        When processing a 50 GB log file or multi-million row dataset, eager lists load every record into heap memory simultaneously, causing server Out-of-Memory kernel panics.
+      \end{WarningBox}
+      \vspace{0.10cm}
+      {\scriptsize\color{UpGradSlate}How can we process 10M records without loading them all at once?}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-035
+% Narrative Role: Solution / Comparative Diagram
+% Cognitive Objective: Understand how generator expressions stream data in O(1) memory.
+% Plan Source: slide_plan.md / S01-035
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Solution: Lazy Streaming with \texttt{yield} \& Generators}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Eager List Comprehension \InlineCode{[...]}}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+squares = [x * 2 for x in range(10M)]
+# Allocates 450 MB RAM!
+      \end{CodeBlock}
+      \vspace{0.08cm}
+      \StatCard{UpGradRed}{450 MB}{RAM Usage}{All 10M items stored in memory}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}Lazy Generator Expression \InlineCode{(...)}}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+squares = (x * 2 for x in range(10M))
+# Allocates 8.4 KB RAM!
+      \end{CodeBlock}
+      \vspace{0.08cm}
+      \StatCard{AWSEmerald}{8.4 KB}{Constant RAM}{Evaluated one item on-demand}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{Changing \InlineCode{[...]} to \InlineCode{(...)} reduces memory footprint by $50,000\times$ via lazy evaluation.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-036
+% Narrative Role: VM Internals / Trace
+% Cognitive Objective: Master the execution lifecycle of yield, frame suspension, and StopIteration.
+% Plan Source: slide_plan.md / S01-036
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Generator Internals: Execution Suspension \& \texttt{yield}}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.42\textwidth}
+      \begin{CodeBlock}{Python}
+def count_stream():
+    yield 1 # Suspends frame!
+    yield 2 # Resumes on next()
+    return  # StopIteration
+
+s = count_stream()
+print(next(s)) # 1
+print(next(s)) # 2
+      \end{CodeBlock}
+    \end{column}
+    \begin{column}{0.55\textwidth}
+      \begin{ConceptBox}{Execution State Suspension}
+        \scriptsize
+        \InlineCode{return} destroys the local stack frame. In contrast, \InlineCode{yield} pauses bytecode execution, preserves local variable pointers on the heap, and yields control back to caller.
+      \end{ConceptBox}
+      \vspace{0.08cm}
+      \centering
+      \DrawGeneratorLifecycle
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-037
+% Narrative Role: Concept / Paradigm Shift
+% Cognitive Objective: Understand that functions in Python are ordinary objects.
+% Plan Source: slide_plan.md / S01-037
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{First-Class Functions: Functions as Heap Objects}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.31\textwidth}
+      \begin{ConceptBox}{1. Assign to Variable}
+        \begin{CodeBlock}{Python}
+def greet():
+    return "hi"
+
+f = greet # Pointer alias
+print(f()) # "hi"
+        \end{CodeBlock}
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.31\textwidth}
+      \begin{ConceptBox}{2. Pass as Argument}
+        \begin{CodeBlock}{Python}
+def run(fn, val):
+    return fn(val)
+
+def dbl(x):
+    return x * 2
+run(dbl, 5) # 10
+        \end{CodeBlock}
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.31\textwidth}
+      \begin{ConceptBox}{3. Return from Function}
+        \begin{CodeBlock}{Python}
+def get_adder(n):
+    def add(x):
+        return x + n
+    return add
+
+p = get_adder(5)
+        \end{CodeBlock}
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{Functions in Python are full \InlineCode{PyFunctionObject} instances that live on the heap.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-038
+% Narrative Role: Mechanistic Deep-Dive
+% Cognitive Objective: Understand how nested functions retain access to outer variables via __closure__ cell objects.
+% Plan Source: slide_plan.md / S01-038
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Function Closures: Capturing Free Variables}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{3,8}
+def make_multiplier(factor):
+    def multiply(x):
+        return x * factor  # 'factor' is captured!
+    return multiply
+
+triple = make_multiplier(3)
+print(triple(10))  # 30
+# Inspecting internal closure cell:
+print(triple.__closure__[0].cell_contents) # 3
+      \end{HighlightedCodeBlock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      \DrawClosureCellDiagram
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{Closures store free variables in a heap-allocated \InlineCode{PyCellObject} that outlives the outer function.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-039
+% Narrative Role: Syntax Breakdown
+% Cognitive Objective: Demystify decorator @ syntax as higher-order function composition.
+% Plan Source: slide_plan.md / S01-039
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Decorators Desugared: The \texttt{@syntax} Equivalence}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradNight}Decorated Function Syntax}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+@time_it
+def fetch_data(query):
+    # Connect and query DB
+    return results
+      \end{CodeBlock}
+      \vspace{0.08cm}
+      {\scriptsize\color{UpGradSlate}Clean, non-invasive syntactic sugar.}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSBlue}Exact Mechanical Equivalent}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+def fetch_data(query):
+    # Connect and query DB
+    return results
+
+# Pure Function Reassignment:
+fetch_data = time_it(fetch_data)
+      \end{CodeBlock}
+      \vspace{0.08cm}
+      {\scriptsize\color{AWSBlue}Rebinds the function name to the returned wrapper!}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{Formula: \quad \InlineCode{@decorator} \quad $\iff$ \quad \InlineCode{func = decorator(func)}}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-040
+% Narrative Role: Code Pattern Blueprint
+% Cognitive Objective: Master the standard 2-level wrapper template with *args and **kwargs.
+% Plan Source: slide_plan.md / S01-040
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Canonical 2-Level Decorator Blueprint}
+  \begin{HighlightedCodeBlock}{Python}{4,5,7,10,11}
+import time
+import functools
+
+def timer(func):                       # 1. Accepts target function
+    @functools.wraps(func)             # 2. Preserves function metadata!
+    def wrapper(*args, **kwargs):      # 3. Accepts arbitrary parameters
+        t0 = time.perf_counter()
+        result = func(*args, **kwargs) # 4. Invokes original function
+        elapsed = time.perf_counter() - t0
+        print(f"[{func.__name__}] took {elapsed:.4f}s")
+        return result                  # 5. Returns original result
+    return wrapper                     # 6. Returns wrapper object
+  \end{HighlightedCodeBlock}
+  \vfill
+  \TakeawayBanner{This universal blueprint captures all parameters with \InlineCode{*args, **kwargs} and preserves metadata.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-041
+% Narrative Role: Failure Mode / Best Practice
+% Cognitive Objective: Understand how missing @functools.wraps destroys function introspection.
+% Plan Source: slide_plan.md / S01-041
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Why \texttt{@functools.wraps} Is Mandatory}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Without \InlineCode{@functools.wraps}}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+print(fetch_data.__name__)
+# Output: "wrapper" (Name Lost!)
+
+print(fetch_data.__doc__)
+# Output: None (Docstring Lost!)
+      \end{CodeBlock}
+      \vspace{0.04cm}
+      {\scriptsize\color{UpGradRedDark}Breaks FastAPI routes, Sphinx docs, and Pytest test runners!}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}With \InlineCode{@functools.wraps(func)}}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+print(fetch_data.__name__)
+# Output: "fetch_data" (Preserved!)
+
+print(fetch_data.__doc__)
+# Output: "Queries lake..." (Preserved!)
+      \end{CodeBlock}
+      \vspace{0.04cm}
+      {\scriptsize\color{AWSEmerald}Copies \InlineCode{\_\_name\_\_}, \InlineCode{\_\_doc\_\_}, \InlineCode{\_\_module\_\_}, and \InlineCode{\_\_annotations\_\_}.}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{Always use \InlineCode{@functools.wraps(func)} on every decorator wrapper to maintain API introspection.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-042
+% Narrative Role: Applied Industry Context
+% Cognitive Objective: Connect custom decorators to standard decorators in Streamlit, PyTorch, and Dataclasses.
+% Plan Source: slide_plan.md / S01-042
+% -----------------------------------------------------------------------------
+\begin{frame}{Everyday Data Science \& ML Decorators Demystified}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{@st.cache\_data (Streamlit)}
+        \scriptsize Wraps data ingestion with memoized hashing cache so UI interactions do not re-query databases.
+      \end{ConceptBox}
+      \vspace{0.05cm}
+      \begin{ConceptBox}{@torch.no\_grad() (PyTorch)}
+        \scriptsize Wraps forward pass to disable autograd computation graphs during model inference.
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{@pytest.fixture (Pytest)}
+        \scriptsize Injects mock datasets and database sessions dynamically into unit tests via dependency injection.
+      \end{ConceptBox}
+      \vspace{0.05cm}
+      \begin{ConceptBox}{@dataclass (Standard Library)}
+        \scriptsize Inspects class type annotations and auto-synthesizes boilerplate \InlineCode{\_\_init\_\_} and \InlineCode{\_\_repr\_\_}.
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.06cm}
+  \TakeawayBanner{Decorators are the backbone of modern enterprise data science frameworks.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-043
+% Narrative Role: Full Production Code Demo
+% Cognitive Objective: Combine sets, generators, and @timer into a complete pipeline.
+% Plan Source: slide_plan.md / S01-043
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Authentic Application: Memory-Bounded Log Profiler}
+  \begin{HighlightedCodeBlock}{Python}{1,4,7,11}
+@timer
+def process_server_logs(file_path: str) -> int:
+    seen_ip_addresses = set()  # O(1) membership & deduplication
+
+    # Lazy generator: Streams 1 line at a time in O(1) RAM
+    def stream_log_lines(path):
+        with open(path, "r") as f:
+            for line in f:
+                yield line.strip()
+
+    for line in stream_log_lines(file_path):
+        ip = line.split(" - ")[0]
+        seen_ip_addresses.add(ip)  # O(1) insertion
+
+    return len(seen_ip_addresses)
+  \end{HighlightedCodeBlock}
+  \vfill
+  \TakeawayBanner{Synergy: Generators eliminate RAM spikes, sets guarantee $O(1)$ search, and decorators profile latency.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-044
+% Narrative Role: Transfer Challenge
+% Cognitive Objective: Implement a parameterized decorator that retries flaky network/database calls.
+% Plan Source: slide_plan.md / S01-044
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Transfer Challenge 2: The Resilient API \texttt{@retry} Decorator}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.52\textwidth}
+      \begin{CodeBlock}{Python}
+# Desired Usage Contract:
+@retry(max_retries=3, delay=1.0)
+def fetch_api_telemetry(endpoint):
+    # Network request that might fail
+    pass
+      \end{CodeBlock}
+      \vspace{0.08cm}
+      \begin{ConceptBox}{The Problem}
+        \scriptsize Cloud endpoints and databases experience intermittent network blips. We need automatic retries before failing.
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \begin{QuestionBox}{How Many Function Levels?}
+        \scriptsize To pass arguments like \InlineCode{max\_retries=3} into a decorator, how many nested function levels are required?
+        \begin{itemize}\setlength{\itemsep}{0.08cm}
+          \item[\textbf{A)}] 1 Level
+          \item[\textbf{B)}] 2 Levels
+          \item[\textbf{C)}] 3 Levels
+        \end{itemize}
+      \end{QuestionBox}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-045
+% Narrative Role: Solution / Explanation
+% Cognitive Objective: Master the 3-level decorator pattern for custom decorator arguments.
+% Plan Source: slide_plan.md / S01-045
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Transfer Challenge 2: Solution \& 3-Level Parameterization}
+  \begin{HighlightedCodeBlock}{Python}{1,2,4,7,12}
+def retry(max_retries=3, delay=1.0):      # Level 1: Decorator arguments
+    def decorator(func):                  # Level 2: Target function
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):     # Level 3: Runtime call args
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_retries:
+                        raise e
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+  \end{HighlightedCodeBlock}
+  \vfill
+  \TakeawayBanner{Parameterized decorators require 3 levels: Config Args $\to$ Target Function $\to$ Runtime Wrapper.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-046
+% Narrative Role: Synthesis
+% Cognitive Objective: Consolidate Block 2 takeaways into a cohesive operational mental model.
+% Plan Source: slide_plan.md / S01-046
+% -----------------------------------------------------------------------------
+\begin{frame}{Block 2 Synthesis: Speed, Streams \& Wrappers}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.31\textwidth}
+      \StatCard{AWSEmerald}{Hash Tables}{O(1) Lookups}{Direct addressing via immutable hash contracts}
+    \end{column}
+    \begin{column}{0.31\textwidth}
+      \StatCard{AWSBlue}{Generators}{O(1) Memory}{Lazy stream processing with suspended execution}
+    \end{column}
+    \begin{column}{0.31\textwidth}
+      \StatCard{UpGradRed}{Decorators}{Meta-Code}{Non-invasive logic injection with @functools.wraps}
+    \end{column}
+  \end{columns}
+  \vspace{0.20cm}
+  \begin{ConceptBox}{Block 2 Architectural Takeaway}
+    \scriptsize Sets give us algorithmic search speed, generators prevent out-of-memory crashes on big data, and decorators decouple cross-cutting concerns (timing, retries, auth) from business logic.
+  \end{ConceptBox}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-047
+% Narrative Role: Transition / Tension
+% Cognitive Objective: Introduce the severe performance limitations of pure Python loops in math.
+% Plan Source: slide_plan.md / S01-047
+% -----------------------------------------------------------------------------
+\begin{frame}{Bridge to Block 3: The Limits of Pure Python}
+  \begin{center}
+    \vspace{0.15cm}
+    \begin{tcolorbox}[enhanced,arc=2mm,boxrule=.6pt,colback=UpGradNight,colframe=AWSSquid,
+      left=6mm,right=6mm,top=4mm,bottom=4mm,width=0.92\linewidth]
+      {\UpGradDisplayFont\fontsize{11.5}{16}\selectfont\bfseries\color{white}
+        “We now know how to manage memory, stream data, and wrap functions. But what happens when we need to run intensive mathematical calculations across millions of numbers? Why does pure Python hit a brutal speed wall, and how does NumPy solve it?”
+      }
+    \end{tcolorbox}
+  \end{center}
+  \vfill
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \StatCard{UpGradRed}{28.5 s}{Pure Python Matrix Mul}{Boxed pointer loops \& dynamic dispatch}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \StatCard{AWSEmerald}{3.8 ms}{NumPy Vectorized C}{7,500x Speedup with SIMD contiguous buffers}
+    \end{column}
+  \end{columns}
+\end{frame}

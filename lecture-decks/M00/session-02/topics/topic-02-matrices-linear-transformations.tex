@@ -1,0 +1,186 @@
+\documentclass[../m00-session-02.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{02}{What is a Matrix, Really? Linear Transformations}{Applied Linear Algebra via NumPy}
+\TopicDivider{02}{What is a Matrix, Really? Linear Transformations}{Matrices as spatial deformation operators, basis shifts, determinants, and rank.}
+
+% -----------------------------------------------------------------------------
+% Frame 1: Cognitive Objectives
+% -----------------------------------------------------------------------------
+\begin{frame}{Cognitive Objectives}
+  \begin{LearningObjectives}{By the end of this topic, learners will be able to:}
+    \begin{itemize}\setlength{\itemsep}{0.28em}
+      \item \textbf{Visualize matrices as spatial operators} that stretch, rotate, and shear coordinate space rather than static number grids.
+      \item \textbf{Track basis transformations} by mapping where standard unit vectors $\hat{\mathbf{i}}$ and $\hat{\mathbf{j}}$ land.
+      \item \textbf{Interpret determinants geometrically} as area/volume scaling factors ($\det(\mathbf{A}) = 0 \implies$ irreversible compression).
+      \item \textbf{Diagnose linear systems} using Column Space $\mathcal{C}(\mathbf{A})$, Null Space $\mathcal{N}(\mathbf{A})$, and the Rank-Nullity Theorem.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 2: The Socratic Hook (The Disappearing Dimension Mystery)
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Disappearing Dimension Mystery}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The Collision: Matrix as Compression}\par\vspace{0.06cm}
+      Consider $\mathbf{A} = \begin{bmatrix} 1 & 2 \\ 2 & 4 \end{bmatrix}$.
+      \par\vspace{0.04cm}
+      \begin{itemize}\setlength{\itemsep}{0.18em}\small
+        \item Multiply 10,000 diverse 2D data points $\mathbf{x} \in \mathbb{R}^2$ by $\mathbf{A}$.
+        \item Every single transformed point $\mathbf{A}\mathbf{x}$ lands on the line $y = 2x$!
+        \item \textcolor{UpGradRed}{\textbf{Socratic Question:}} Can we ever reconstruct the original 2D points from the output?
+      \end{itemize}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The "Aha!" Discovery: Landing Sites}\par\vspace{0.06cm}
+      \begin{itemize}\setlength{\itemsep}{0.18em}\small
+        \item Standard basis: $\hat{\mathbf{i}} = [1, 0]^T$ and $\hat{\mathbf{j}} = [0, 1]^T$.
+        \item $\mathbf{A}\hat{\mathbf{i}} = [1, 2]^T$ (Col 1 of $\mathbf{A}$).
+        \item $\mathbf{A}\hat{\mathbf{j}} = [2, 4]^T = 2 \cdot [1, 2]^T$ (Col 2).
+        \item Columns are linearly dependent ($\mathbf{c}_2 = 2\mathbf{c}_1$).
+        \item The entire 2D universe is flattened into a 1D line!
+      \end{itemize}
+      \vspace{0.04cm}
+      \TakeawayBanner{Columns tell you where the standard basis vectors land.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 3: Hero Visualization: Grid Deformation Under A
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Grid Deformation Under $\mathbf{A}$}
+  \VisualExploration[.56]{%
+    \begin{tikzpicture}[scale=0.82,>=stealth,every node/.style={transform shape}]
+      % Left Sub-panel: Original Cartesian Grid
+      \begin{scope}[shift={(-3.2,0)}]
+        \draw[step=0.6cm, UpGradRule!60, very thin] (-0.3,-0.3) grid (2.7,2.7);
+        \draw[->, thick, UpGradSlate] (-0.3,0) -- (2.7,0) node[right, font=\tiny] {$x$};
+        \draw[->, thick, UpGradSlate] (0,-0.3) -- (0,2.7) node[above, font=\tiny] {$y$};
+        
+        % Unit square
+        \fill[UpGradRed!15] (0,0) rectangle (1.2,1.2);
+        \draw[thick, UpGradRed] (0,0) rectangle (1.2,1.2);
+        
+        % Basis vectors
+        \draw[->, line width=1.6pt, UpGradRed] (0,0) -- (1.2,0) node[below, font=\tiny\bfseries] {$\hat{\mathbf{i}}$};
+        \draw[->, line width=1.6pt, AWSBlue] (0,0) -- (0,1.2) node[left, font=\tiny\bfseries] {$\hat{\mathbf{j}}$};
+        \node[font=\tiny\bfseries\color{UpGradNight}] at (0.6,0.6) {$\text{Area} = 1$};
+        \node[above, font=\scriptsize\bfseries\color{UpGradNight}] at (1.2,2.7) {Input Space $\mathbb{R}^2$};
+      \end{scope}
+      
+      % Transformation Arrow
+      \draw[->, ultra thick, AWSOrange] (0.0, 1.2) -- (1.2, 1.2) node[midway, above, font=\scriptsize\bfseries\color{AWSOrange}] {$\mathbf{x} \mapsto \mathbf{A}\mathbf{x}$};
+      
+      % Right Sub-panel: Transformed Sheared Grid
+      \begin{scope}[shift={(2.0,0)}]
+        % A = [2, 1; 0.5, 1.5] -> i_hat -> (1.6, 0.4), j_hat -> (0.8, 1.6)
+        % Transformed parallelogram
+        \fill[AWSOrange!15] (0,0) -- (1.6,0.4) -- (2.4,2.0) -- (0.8,1.6) -- cycle;
+        \draw[thick, AWSOrange] (0,0) -- (1.6,0.4) -- (2.4,2.0) -- (0.8,1.6) -- cycle;
+        
+        % Transformed grid lines
+        \foreach \i in {-0.5,0,0.5,1,1.5} {
+          \draw[UpGradRule!70, thin] ($(\i*1.6,\i*0.4) + (-0.4*0.8,-0.4*1.6)$) -- ($(\i*1.6,\i*0.4) + (1.4*0.8,1.4*1.6)$);
+          \draw[UpGradRule!70, thin] ($(\i*0.8,\i*1.6) + (-0.4*1.6,-0.4*0.4)$) -- ($(\i*0.8,\i*1.6) + (1.4*1.6,1.4*0.4)$);
+        }
+        
+        % Transformed vectors
+        \draw[->, line width=1.8pt, UpGradRed] (0,0) -- (1.6,0.4) node[right, font=\tiny\bfseries] {$\mathbf{A}\hat{\mathbf{i}}$};
+        \draw[->, line width=1.8pt, AWSBlue] (0,0) -- (0.8,1.6) node[above, font=\tiny\bfseries] {$\mathbf{A}\hat{\mathbf{j}}$};
+        \node[font=\tiny\bfseries\color{AWSOrange}] at (1.2,1.0) {$|\det(\mathbf{A})|$};
+        \node[above, font=\scriptsize\bfseries\color{UpGradNight}] at (1.2,2.7) {Output Space $\mathbb{R}^2$};
+      \end{scope}
+    \end{tikzpicture}%
+  }{Matrices as Spatial Operators}{%
+    \begin{itemize}\setlength{\itemsep}{0.25em}
+      \item \textbf{Line of Action:} Every linear transformation keeps the origin fixed and keeps grid lines parallel and evenly spaced.
+      \item \textbf{Coordinate Recipe:} Any vector $\mathbf{v} = x\hat{\mathbf{i}} + y\hat{\mathbf{j}}$ transforms to:
+        \[
+        \mathbf{A}\mathbf{v} = x(\mathbf{A}\hat{\mathbf{i}}) + y(\mathbf{A}\hat{\mathbf{j}})
+        \]
+      \item Matrix multiplication is simply taking linear combinations of the matrix columns!
+    \end{itemize}
+  }
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 4: Hero Visualization: Determinant as Area Scaling & Rank Collapse
+% -----------------------------------------------------------------------------
+\begin{frame}{Hero Visualization: Determinants \& Information Collapse}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        {\small\bfseries\color{AWSEmerald}Non-Singular Matrix ($\det(\mathbf{A}) \neq 0$)}\par\vspace{0.04cm}
+        \begin{tikzpicture}[scale=0.74]
+          \draw[->, thick, UpGradSlate!60] (-0.3,0) -- (3.5,0) node[right, font=\tiny] {$x_1$};
+          \draw[->, thick, UpGradSlate!60] (0,-0.3) -- (0,3.2) node[above, font=\tiny] {$x_2$};
+          
+          % Parallelogram
+          \fill[AWSEmerald!15, draw=AWSEmerald, thick] (0,0) -- (2.2,0.5) -- (3.0,2.5) -- (0.8,2.0) -- cycle;
+          \draw[->, line width=1.5pt, UpGradRed] (0,0) -- (2.2,0.5) node[below right=-2pt, font=\tiny\bfseries] {$\mathbf{c}_1$};
+          \draw[->, line width=1.5pt, AWSBlue] (0,0) -- (0.8,2.0) node[above left=-2pt, font=\tiny\bfseries] {$\mathbf{c}_2$};
+          \node[font=\small\bfseries\color{AWSEmerald}] at (1.5,1.2) {$\text{Area} = |\det(\mathbf{A})|$};
+        \end{tikzpicture}
+      \end{center}
+      \vspace{-0.15cm}
+      {\scriptsize\color{UpGradSlate}\textbf{Properties:} Area is scaled by $|\det(\mathbf{A})|$. Full Rank ($\text{Rank} = 2$). Transformation is \textbf{reversible} ($\mathbf{A}^{-1}$ exists).}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        {\small\bfseries\color{UpGradRed}Singular Matrix ($\det(\mathbf{A}) = 0$)}\par\vspace{0.04cm}
+        \begin{tikzpicture}[scale=0.74]
+          \draw[->, thick, UpGradSlate!60] (-0.3,0) -- (3.5,0) node[right, font=\tiny] {$x_1$};
+          \draw[->, thick, UpGradSlate!60] (0,-0.3) -- (0,3.2) node[above, font=\tiny] {$x_2$};
+          
+          % Crushed line segment
+          \draw[line width=3.5pt, UpGradRed!30] (0,0) -- (3.0,2.0);
+          \draw[->, line width=1.8pt, UpGradRed] (0,0) -- (1.5,1.0) node[above left, font=\tiny\bfseries] {$\mathbf{c}_1$};
+          \draw[->, line width=1.8pt, AWSBlue] (0,0) -- (3.0,2.0) node[above right, font=\tiny\bfseries] {$\mathbf{c}_2 = 2\mathbf{c}_1$};
+          \node[font=\small\bfseries\color{UpGradRed}] at (1.8,0.4) {$\text{Area} = 0$};
+        \end{tikzpicture}
+      \end{center}
+      \vspace{-0.15cm}
+      {\scriptsize\color{UpGradSlate}\textbf{Properties:} Area collapsed to zero. Rank deficient ($\text{Rank} = 1$). Null space is 1D line ($\text{Nullity} = 1$). \textbf{Irreversible information loss}.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Frame 5: Production Code Lock: Inverting vs Solving Linear Systems
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Checkpoint: Solving Linear Systems in NumPy}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}The Anti-Pattern: Explicit Matrix Inversion}\par\vspace{0.06cm}
+\begin{CodeBlock}{Python}
+# DO NOT DO THIS IN PRODUCTION:
+A_inv = np.linalg.inv(A)  # O(n^3) ops
+x = A_inv @ b             # Severe roundoff errors!
+\end{CodeBlock}
+      \vspace{0.04cm}
+      {\scriptsize\color{UpGradSlate}\textbf{Flaw:} Explicit inversion is $3\times$ slower and numerically unstable near ill-conditioned matrices ($\kappa(\mathbf{A}) \gg 1$).}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}The Enterprise Pattern: LU / LAPACK Solve}\par\vspace{0.06cm}
+\begin{CodeBlock}{Python}
+# PRODUCTION-GRADE LAPACK SOLVER:
+# Solves Ax = b via LU decomposition
+x = np.linalg.solve(A, b)
+
+# Verify condition number before solving
+cond = np.linalg.cond(A)
+if cond > 1e12:
+    raise ValueError(f"Ill-conditioned A: {cond}")
+\end{CodeBlock}
+      \vspace{0.04cm}
+      \TakeawayBanner{Always use \InlineCode{np.linalg.solve} over \InlineCode{np.linalg.inv}.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

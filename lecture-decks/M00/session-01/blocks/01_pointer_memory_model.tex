@@ -1,0 +1,685 @@
+% =============================================================================
+% 01_pointer_memory_model.tex — Slides S01-005 to S01-026
+% Block 1: The Object Pointer Mental Model & Memory Semantics
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-005
+% Narrative Role: Block Transition / Tension
+% Cognitive Objective: Establish the local mystery of Block 1.
+% Plan Source: slide_plan.md / S01-005
+% -----------------------------------------------------------------------------
+\TopicDivider{01}{The Object Pointer Mental Model}{Stack pointers, heap PyObjects, mutability traps, and copy semantics.}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-006
+% Narrative Role: Prediction Prompt
+% Cognitive Objective: Commit learners to a prediction regarding mutable default arguments.
+% Plan Source: slide_plan.md / S01-006
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Prediction Task 1: The Multi-Tenant Event Logger}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.52\textwidth}
+      \begin{CodeBlock}{Python}
+def append_event(event_id, log=[]):
+    log.append(event_id)
+    return log
+
+# User A records an event
+print("Call 1:", append_event(101))
+
+# User B records an event
+print("Call 2:", append_event(202))
+      \end{CodeBlock}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{QuestionBox}{What will Call 2 output?}
+        \begin{itemize}\setlength{\itemsep}{0.12cm}
+          \item[\textbf{A)}] \InlineCode{Call 1: [101] \textbar\ Call 2: [202]}
+          \item[\textbf{B)}] \InlineCode{Call 1: [101] \textbar\ Call 2: [101, 202]}
+          \item[\textbf{C)}] \InlineCode{Call 1: [101] \textbar\ Call 2: None}
+          \item[\textbf{D)}] \InlineCode{TypeError: unhashable default}
+        \end{itemize}
+      \end{QuestionBox}
+      \vspace{0.10cm}
+      {\scriptsize\color{UpGradSlate}Commit your prediction in the live poll before proceeding.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-007
+% Narrative Role: Reveal / Dissonance
+% Cognitive Objective: Expose the counter-intuitive reality that User B received User A's data.
+% Plan Source: slide_plan.md / S01-007
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Reveal 1: The Audit Log Contamination Bug}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{CodeBlock}{Python}
+def append_event(event_id, log=[]):
+    log.append(event_id)
+    return log
+
+append_event(101)  # User A
+append_event(202)  # User B
+      \end{CodeBlock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{TerminalWindow}[PYTHON 3.12 INTERPRETER]
+>>> Call 1: [101] \\
+>>> Call 2: [101, 202]  \# <--- CRITICAL STATE LEAK!
+      \end{TerminalWindow}
+      \vspace{0.08cm}
+      \begin{WarningBox}{Cross-Tenant Data Leak}
+        \scriptsize User B received User A's private audit telemetry. Why did Call 2 share User A's list rather than creating a fresh one?
+      \end{WarningBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.08cm}
+  \TakeawayBanner{Option B is correct. Python default arguments are evaluated once at definition time!}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-008
+% Narrative Role: Misconception Breakdown
+% Cognitive Objective: Break the "variable as a value box" mental model.
+% Plan Source: slide_plan.md / S01-008
+% -----------------------------------------------------------------------------
+\begin{frame}{Naive Mental Model vs Physical Reality}
+  \CompareGrid{Naive Model: The Variable as a Box}{
+    \begin{itemize}\setlength{\itemsep}{0.08cm}
+      \item $x$ is a container labeled \InlineCode{"x"}.
+      \item Assigning $x = 42$ puts 42 inside the box.
+      \item Assigning $y = x$ creates a second box with a copy of 42.
+      \item Modifying $y$ never touches $x$.
+    \end{itemize}
+  }{Physical Reality: Names Point to Heap PyObjects}{
+    \begin{itemize}\setlength{\itemsep}{0.08cm}
+      \item $x$ is an 8-byte pointer in the stack frame.
+      \item 42 lives in a 28-byte \InlineCode{PyObject} struct in heap RAM.
+      \item Assigning $y = x$ copies the 64-bit pointer address.
+      \item Both names reference the \textbf{exact same heap struct}!
+    \end{itemize}
+  }
+  \vspace{0.18cm}
+  \TakeawayBanner{In Python, variables store memory addresses, never raw data values.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-009
+% Narrative Role: Mechanistic Explanation
+% Cognitive Objective: Understand the internal C structure of all Python objects.
+% Plan Source: slide_plan.md / S01-009
+% -----------------------------------------------------------------------------
+\begin{frame}{Inside the Heap: Anatomy of a PyObject}
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.54\textwidth}
+      \DrawPyObjectStruct{0x100A}{1}{<class 'int'>}{42}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \begin{ConceptBox}{The 28-Byte Overhead}
+        \scriptsize
+        \begin{itemize}\setlength{\itemsep}{0.05cm}
+          \item \textbf{ob\_refcnt} (8B): Tracks active pointers.
+          \item \textbf{ob\_type*} (8B): Pointer to type descriptor.
+          \item \textbf{ob\_ival} (8-12B): Raw numerical payload.
+        \end{itemize}
+      \end{ConceptBox}
+      \vspace{0.06cm}
+      \StatCard{UpGradRed}{28 Bytes}{Minimum Int Size}{3.5x overhead vs 8-byte C int64}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-010
+% Narrative Role: Flipbook Sequence (Step 1/2)
+% Cognitive Objective: Visually observe x = 42 in heap memory.
+% Plan Source: slide_plan.md / S01-010
+% -----------------------------------------------------------------------------
+% -----------------------------------------------------------------------------
+% Slide ID: S01-010
+% Narrative Role: Flipbook Sequence (Step 1/2)
+% Cognitive Objective: Visually observe x = 42 in heap memory.
+% Plan Source: slide_plan.md / S01-010
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Variable Binding: Step 1 (\texttt{x = 42})}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.35\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{1}
+x = 42
+      \end{HighlightedCodeBlock}
+      \vspace{0.12cm}
+      \begin{ConceptBox}{Execution Step 1}
+        \scriptsize CPython allocates a \InlineCode{PyLongObject} at address \InlineCode{0x100A} with \InlineCode{ob\_refcnt = 1}. The stack name \InlineCode{x} stores \InlineCode{0x100A}.
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.62\textwidth}
+      \centering
+      \DrawPointerRebinding{1}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{Binding assigns a memory pointer to a stack name.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-011
+% Narrative Role: Flipbook Sequence (Step 2/2)
+% Cognitive Objective: Visually observe x = "hello" rebind the pointer without altering previous object.
+% Plan Source: slide_plan.md / S01-011
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Variable Rebinding: Step 2 (\texttt{x = "hello"})}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.35\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{2}
+x = 42
+x = "hello"  # Rebind!
+      \end{HighlightedCodeBlock}
+      \vspace{0.12cm}
+      \begin{ConceptBox}{Execution Step 2}
+        \scriptsize The name \InlineCode{x} is repointed to \InlineCode{0x200B}. The integer at \InlineCode{0x100A} sees \InlineCode{ob\_refcnt = 0} and is queued for garbage collection.
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.62\textwidth}
+      \centering
+      \DrawPointerRebinding{2}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{Variables do not mutate types; variables repoint to different typed objects.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-012
+% Narrative Role: Formalization / Concept
+% Cognitive Objective: Differentiate between content comparison (__eq__) and memory address comparison (id()).
+% Plan Source: slide_plan.md / S01-012
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Value Equality (\texttt{==}) vs Reference Identity (\texttt{is})}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{Value Equality: \InlineCode{a == b}}
+        \begin{itemize}
+          \item Calls \InlineCode{a.\_\_eq\_\_(b)}.
+          \item Compares internal structural contents.
+          \item Returns \InlineCode{True} if values are identical.
+        \end{itemize}
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{Reference Identity: \InlineCode{a is b}}
+        \begin{itemize}
+          \item Evaluates \InlineCode{id(a) == id(b)}.
+          \item Compares 64-bit physical heap addresses.
+          \item Returns \InlineCode{True} ONLY if both names share one object.
+        \end{itemize}
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \begin{HighlightedCodeBlock}{Python}{3,4}
+list1 = [1, 2, 3]
+list2 = [1, 2, 3]
+print(list1 == list2)  # True  (Contents match!)
+print(list1 is list2)  # False (Two distinct physical heap allocations!)
+  \end{HighlightedCodeBlock}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-013
+% Narrative Role: Optimization Deep-Dive
+% Cognitive Objective: Understand why small integers share identical memory pointers.
+% Plan Source: slide_plan.md / S01-013
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The CPython Integer Cache Optimization: \texttt{[-5, 256]}}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{CodeBlock}{Python}
+# Within singleton cache [-5, 256]:
+a = 256
+b = 256
+print(a is b)  # True (Shared singleton!)
+
+# Outside cache (> 256):
+x = 257
+y = 257
+print(x is y)  # False (Separate heap objects)
+      \end{CodeBlock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{CPython Small Integer Singleton Pool}
+        \scriptsize
+        To avoid allocating millions of tiny objects, CPython pre-allocates an array of \InlineCode{PyLongObject} singletons for integers in the range $[-5, 256]$ at interpreter boot.
+      \end{ConceptBox}
+      \vspace{0.10cm}
+      \begin{WarningBox}{Never Use 'is' for Numbers}
+        \scriptsize Code relying on \InlineCode{x is 256} works by accident of CPython's cache and fails for \InlineCode{x is 257}. Always use \InlineCode{==}.
+      \end{WarningBox}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-014
+% Narrative Role: Prediction / Comparison
+% Cognitive Objective: Master the critical difference between mutating a heap object in-place and rebinding.
+% Plan Source: slide_plan.md / S01-014
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{In-Place Mutation (\texttt{+=}) vs Rebinding (\texttt{= +})}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSBlue}In-Place Mutation (\InlineCode{\_\_iadd\_\_})}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+x = [1, 2]
+y = x
+x += [3]  # Calls __iadd__()
+print("y:", y)  # [1, 2, 3] !
+      \end{CodeBlock}
+      \vspace{0.05cm}
+      {\scriptsize\color{UpGradRedDark}Mutates the existing heap container in-place; \InlineCode{y} sees the modification.}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Reference Rebinding (\InlineCode{\_\_add\_\_})}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+a = [1, 2]
+b = a
+a = a + [3]  # Calls __add__()
+print("b:", b)  # [1, 2] !
+      \end{CodeBlock}
+      \vspace{0.05cm}
+      {\scriptsize\color{AWSEmerald}Allocates a fresh list and rebinds \InlineCode{a}; \InlineCode{b} remains untouched.}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{\InlineCode{+=} mutates existing heap RAM in-place; \InlineCode{= +} constructs a brand-new object.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-015
+% Narrative Role: Mechanism Reveal
+% Cognitive Objective: Discover that default arguments are evaluated once when the module loads.
+% Plan Source: slide_plan.md / S01-015
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Root Cause: Function Definition-Time Evaluation}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{1,7}
+def append_event(event_id, log=[]):
+    log.append(event_id)
+    return log
+
+# Inspecting the function's internal metadata:
+print(append_event.__defaults__)
+# Output: ([],) -> Persists across calls!
+      \end{HighlightedCodeBlock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{Function Definition Lifecycle}
+        \scriptsize
+        \begin{enumerate}\setlength{\itemsep}{0.06cm}
+          \item \textbf{Def Time (Module Load):} CPython compiles bytecode, allocates \InlineCode{[]} on heap, and stores pointer in \InlineCode{fn.\_\_defaults\_\_}.
+          \item \textbf{Runtime Invocations:} Every call missing the argument reads from \InlineCode{fn.\_\_defaults\_\_[0]}!
+        \end{enumerate}
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.08cm}
+  \TakeawayBanner{Default arguments are evaluated ONCE at function definition time, NOT at execution time.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-016
+% Narrative Role: Best Practice / Code Refactoring
+% Cognitive Objective: Implement the standard Python idiom for safe default arguments.
+% Plan Source: slide_plan.md / S01-016
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Production Fix: The Immutable Sentinel Pattern}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{tcolorbox}[enhanced,arc=1.2mm,boxrule=.4pt,colback=UpGradRed!8,colframe=UpGradRed,title={\bfseries\scriptsize Anti-Pattern (State Leak Hazard)},coltitle=white]
+        \begin{CodeBlock}{Python}
+def append_event(event_id, log=[]):
+    log.append(event_id)
+    return log
+        \end{CodeBlock}
+        \vspace{0.02cm}
+        {\tiny\color{UpGradRedDark}*Shared mutable list causes cross-tenant state leaks.}
+      \end{tcolorbox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{tcolorbox}[enhanced,arc=1.2mm,boxrule=.4pt,colback=AWSEmerald!8,colframe=AWSEmerald,title={\bfseries\scriptsize Production Pattern (Defensive Sentinel)},coltitle=white]
+        \begin{CodeBlock}{Python}
+def append_event(event_id, log=None):
+    if log is None:
+        log = [] # Fresh allocation per call!
+    log.append(event_id)
+    return log
+        \end{CodeBlock}
+        \vspace{0.02cm}
+        {\tiny\color{AWSEmerald}*Allocates a fresh heap list on every call if log is None.}
+      \end{tcolorbox}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{Always use immutable sentinels (\InlineCode{None}) for default collection parameters.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-017
+% Narrative Role: Concept / Memory Diagram
+% Cognitive Objective: Visualize aliasing in nested compound structures.
+% Plan Source: slide_plan.md / S01-017
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Object Aliasing: Two Names, One Compound Object}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.38\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{2}
+a = [1, [2, 3]]
+b = a  # Pointer Assignment (Alias)
+
+b.append(4)
+print("a:", a) # [1, [2, 3], 4]!
+      \end{HighlightedCodeBlock}
+      \vspace{0.08cm}
+      {\scriptsize\color{UpGradSlate}Assignment copies the outer pointer \InlineCode{0x100}. Zero cloning occurs.}
+    \end{column}
+    \begin{column}{0.58\textwidth}
+      \centering
+      \DrawCopySemanticsDiagram{1}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{Variable assignment (\InlineCode{b = a}) creates an alias to the identical outer container.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-018
+% Narrative Role: Mechanistic Deep-Dive
+% Cognitive Objective: Understand that shallow copy duplicates ONLY the top-level pointer array.
+% Plan Source: slide_plan.md / S01-018
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Shallow Copy: What Actually Gets Duplicated?}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.38\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{2,4}
+a = [1, [2, 3]]
+b = a.copy()  # Shallow Copy
+
+b[1].append(99) # Mutate inner list!
+print("a:", a)  # [1, [2, 3, 99]]!
+      \end{HighlightedCodeBlock}
+      \vspace{0.08cm}
+      {\scriptsize\color{AWSOrange}\textbf{Warning:} The outer container is duplicated, but inner pointers are shared!}
+    \end{column}
+    \begin{column}{0.58\textwidth}
+      \centering
+      \DrawCopySemanticsDiagram{2}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{Shallow copy duplicates the outer array, but retains shared pointers to nested objects.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-019
+% Narrative Role: Solution / Diagram
+% Cognitive Objective: Master recursive graph duplication via copy.deepcopy.
+% Plan Source: slide_plan.md / S01-019
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Deep Copy: Recursive Pointer Graph Duplication}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.38\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{2}
+import copy
+b = copy.deepcopy(a)  # Deep Clone
+
+b[1].append(99)
+print("a:", a) # [1, [2, 3]] (Intact!)
+print("b:", b) # [1, [2, 3, 99]]
+      \end{HighlightedCodeBlock}
+      \vspace{0.08cm}
+      {\scriptsize\color{AWSEmerald}\textbf{Complete Isolation:} Recursively duplicates all nested compound objects.}
+    \end{column}
+    \begin{column}{0.58\textwidth}
+      \centering
+      \DrawCopySemanticsDiagram{3}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{Use \InlineCode{copy.deepcopy()} to ensure complete decoupling of nested compound structures.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-020
+% Narrative Role: VM Internals
+% Cognitive Objective: Understand immediate deallocation when ob_refcnt hits zero.
+% Plan Source: slide_plan.md / S01-020
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Memory Deallocation: Reference Counting Mechanics}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{2,5,8}
+import sys
+x = [10, 20]
+# refcnt = 1 (+1 temp arg = 2)
+print(sys.getrefcount(x)) # 2
+
+y = x
+# refcnt = 2 (+1 temp arg = 3)
+print(sys.getrefcount(x)) # 3
+
+del x; del y
+# ob_refcnt -> 0 ==> Immediate free()!
+      \end{HighlightedCodeBlock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{Deterministic Deallocation}
+        \scriptsize
+        Python's primary memory management engine is \textbf{deterministic reference counting}:
+        \begin{itemize}\setlength{\itemsep}{0.08cm}
+          \item Every pointer assignment increments \InlineCode{ob\_refcnt}.
+          \item Rebinding or \InlineCode{del} decrements \InlineCode{ob\_refcnt}.
+          \item When \InlineCode{ob\_refcnt == 0}, CPython immediately calls C \InlineCode{free()}.
+        \end{itemize}
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{CPython frees heap memory the exact moment an object's reference count reaches zero.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-021
+% Narrative Role: Failure Mode / Edge Case
+% Cognitive Objective: Understand why reference counting alone fails when objects point to each other.
+% Plan Source: slide_plan.md / S01-021
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Failure Mode: Cyclic Reference Traps}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{2,3}
+lst = []
+lst.append(lst) # Self-referential cycle!
+del lst         # Stack pointer removed...
+      \end{HighlightedCodeBlock}
+      \vspace{0.10cm}
+      \begin{WarningBox}{Reference Count Never Reaches 0}
+        \scriptsize
+        Even though \InlineCode{lst} is deleted from the stack, the heap object references itself (\InlineCode{ob\_refcnt = 1}). It is unreachable from user code, yet cannot be freed by refcounting!
+      \end{WarningBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        \begin{tikzpicture}[font=\scriptsize\bfseries]
+          \node[draw=UpGradRed,fill=UpGradMist,rounded corners=2mm,thick,minimum width=2.6cm,minimum height=1.2cm,align=center] (nodeA) at (0,0) {
+            Heap Node A\\ \tiny ob\_refcnt = 1
+          };
+          \draw[upgrad/pointer,UpGradRed,thick] (nodeA.north east) to[out=45,in=135,distance=1.6cm] (nodeA.north west);
+          \node[font=\tiny\color{UpGradRedDark}] at (0,1.2) {Self-Reference};
+        \end{tikzpicture}
+      \end{center}
+      \begin{ConceptBox}{Generational Cyclic GC}
+        \scriptsize CPython runs a secondary periodic cyclic garbage collector that tracks container pointers and breaks isolated reference cycles.
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-022
+% Narrative Role: Applied Production Code
+% Cognitive Objective: Apply pointer semantics and sentinels to build an enterprise-grade batch pipeline.
+% Plan Source: slide_plan.md / S01-022
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Authentic Application: Multi-Tenant Batch Ingestion}
+  \begin{HighlightedCodeBlock}{Python}{4,8}
+import copy
+
+class BatchIngestor:
+    def __init__(self, tenant_id: str, default_meta: dict | None = None):
+        self.tenant_id = tenant_id
+        # Defensively clone mutable configs to prevent cross-tenant state corruption!
+        self.meta = copy.deepcopy(default_meta) if default_meta is not None else {}
+        self.records: list[dict] = []
+
+    def ingest(self, batch: list[dict]) -> None:
+        # Shallow copy batch container to protect against external mutation during write
+        self.records.extend(batch.copy())
+  \end{HighlightedCodeBlock}
+  \vfill
+  \TakeawayBanner{Defensive deep copying on config and shallow copying on batch inputs ensures memory isolation.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-023
+% Narrative Role: Interactive Exercise
+% Cognitive Objective: Test student mastery of shallow copy mechanics on nested dictionaries.
+% Plan Source: slide_plan.md / S01-023
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Transfer Challenge 1: The Nested Dictionary Mutation Riddle}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.54\textwidth}
+      \begin{CodeBlock}{Python}
+d1 = {'meta': [10, 20], 'id': 1}
+d2 = d1.copy()  # Shallow Copy
+
+d2['meta'].append(30)
+d2['id'] = 2
+
+print("d1['meta']:", d1['meta'])
+print("d1['id']:", d1['id'])
+      \end{CodeBlock}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \begin{QuestionBox}{Predict the Output for d1}
+        \begin{itemize}\setlength{\itemsep}{0.12cm}
+          \item[\textbf{A)}] \InlineCode{'meta': [10, 20], 'id': 1}
+          \item[\textbf{B)}] \InlineCode{'meta': [10, 20, 30], 'id': 1}
+          \item[\textbf{C)}] \InlineCode{'meta': [10, 20, 30], 'id': 2}
+          \item[\textbf{D)}] \InlineCode{'meta': [10, 20], 'id': 2}
+        \end{itemize}
+      \end{QuestionBox}
+      \vspace{0.10cm}
+      {\scriptsize\color{UpGradSlate}Why did one key change while the other remained untouched?}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-024
+% Narrative Role: Solution / Explanation
+% Cognitive Objective: Reinforce that primitive dictionary values are rebound while mutable nested lists are mutated in-place.
+% Plan Source: slide_plan.md / S01-024
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Transfer Challenge 1: Solution \& Pointer Trace}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{TerminalWindow}[PYTHON EVALUATION]
+>>> d1['meta']: [10, 20, 30]  \# Mutated in-place! \\
+>>> d1['id']: 1               \# Unchanged!
+      \end{TerminalWindow}
+      \vspace{0.12cm}
+      \begin{ConceptBox}{Option B is Correct!}
+        \scriptsize
+        \begin{itemize}
+          \item \InlineCode{d2['id'] = 2} repoints \InlineCode{d2}'s key to integer \InlineCode{2}.
+          \item \InlineCode{d2['meta']} resolves the shared heap list pointer and appends \InlineCode{30} in-place!
+        \end{itemize}
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        \begin{tikzpicture}[font=\ttfamily\tiny,scale=0.88,transform shape]
+          \node[draw=UpGradNight,fill=white,rounded corners=1mm] (d1) at (0,2.0) {d1: {'meta': 0x50, 'id': 1}};
+          \node[draw=AWSBlue,fill=white,rounded corners=1mm] (d2) at (0,0.6) {d2: {'meta': 0x50, 'id': 2}};
+          \node[draw=AWSEmerald,fill=AWSEmerald!15,rounded corners=1mm,thick] (lst) at (3.6,1.3) {0x50: [10, 20, 30]};
+          \draw[upgrad/pointer,UpGradRed] (d1.east) -- (lst.west);
+          \draw[upgrad/pointer,AWSBlue] (d2.east) -- (lst.west);
+        \end{tikzpicture}
+      \end{center}
+    \end{column}
+  \end{columns}
+  \vspace{0.06cm}
+  \TakeawayBanner{Primitives inside shallow copies rebind safely; nested mutable collections alias.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-025
+% Narrative Role: Synthesis
+% Cognitive Objective: Consolidate the 4 core rules of Python memory.
+% Plan Source: slide_plan.md / S01-025
+% -----------------------------------------------------------------------------
+\begin{frame}{Block 1 Synthesis: The Pointer Mental Model}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{1. Variables are Pointers}
+        \scriptsize Stack names store 64-bit heap addresses. Variables do not hold raw data.
+      \end{ConceptBox}
+      \vspace{0.08cm}
+      \begin{ConceptBox}{2. Defaults Evaluated Once}
+        \scriptsize Stored in \InlineCode{fn.\_\_defaults\_\_} at module load. Always use \InlineCode{None} sentinels.
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{3. Rebinding vs Mutation}
+        \scriptsize \InlineCode{=} moves the pointer; \InlineCode{.append()} mutates the heap object in-place.
+      \end{ConceptBox}
+      \vspace{0.08cm}
+      \begin{ConceptBox}{4. Copy Hierarchy}
+        \scriptsize Assignment = alias; Shallow = outer only; Deep = recursive graph clone.
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.10cm}
+  \TakeawayBanner{Mastering Python memory begins with tracking what pointers reference on the heap.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-026
+% Narrative Role: Transition / Bridge
+% Cognitive Objective: Transition from individual memory pointers to collections of millions of pointers.
+% Plan Source: slide_plan.md / S01-026
+% -----------------------------------------------------------------------------
+\begin{frame}{Bridge to Block 2: The Computational Cost of Containers}
+  \begin{center}
+    \vspace{0.15cm}
+    \begin{tcolorbox}[enhanced,arc=2mm,boxrule=.6pt,colback=UpGradNight,colframe=AWSSquid,
+      left=6mm,right=6mm,top=4mm,bottom=4mm,width=0.92\linewidth]
+      {\UpGradDisplayFont\fontsize{12}{16}\selectfont\bfseries\color{white}
+        “If every variable is merely a pointer to a heap object, why do different collection containers take vastly different amounts of time to find the exact same pointer?”
+      }
+    \end{tcolorbox}
+  \end{center}
+  \vfill
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \StatCard{UpGradRed}{120 ms}{List Linear Scan}{Scanning 10,000,000 pointers one-by-one}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \StatCard{AWSEmerald}{45 ns}{Hash Table Lookup}{Direct address jump via hash() \% N}
+    \end{column}
+  \end{columns}
+\end{frame}

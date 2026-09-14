@@ -1,4 +1,4 @@
-# Master Curriculum Overview — Data Science on AWS
+# Master Curriculum Overview — Professional Program in Enterprise Data Science & AI on AWS
 
 > **Status:** 🔲 Draft / High-Level Placeholder  
 > **Course Architecture:** 13 Modules (M00 Foundations + M11 Core Modules + M12 Dedicated Capstone)  
@@ -17,7 +17,7 @@ This comprehensive curriculum equips learners with industry-grade Data Science a
 ```
 +-----------------------------------------------------------------------------------+
 |                        M00: Foundations Pre-Module                                |
-|        (Python for DS, Cloud Fundamentals, Git & Development Environment)         |
+| (Python Programming, Linear Algebra, Statistical Foundations, Software Workflows) |
 +-----------------------------------------+-----------------------------------------+
                                           |
                                           v
@@ -42,27 +42,28 @@ This comprehensive curriculum equips learners with industry-grade Data Science a
 +-----------------------------------------------------------------------------------+
 |                       M12: Comprehensive Capstone Project                         |
 |           (End-to-End Enterprise ML Solution on AWS with Live Evaluation)         |
-+-----------------------------------------------------------------------------------+
++-----------------------------------------+-----------------------------------------+
 ```
 
 ---
 
 ## 📚 13-Module High-Level Curriculum Index
 
-*Details for individual sessions and learning outcomes are documented in the respective [`Mxx_session_plan.md`](./) files.*
+*Details for individual sessions and learning outcomes are documented in the respective module [`Mxx/README.md`](./) directories.*
 
-| Module ID | Module Title | Primary AWS Services | Key Focus Area | Session Plan Link |
+| Module ID | Module Title | Primary Stack / AWS Services | Key Focus Area | Session Plan Link |
 | :---: | :--- | :--- | :--- | :---: |
-| **M00** | Foundations Pre-Module | IAM, S3 Basics, CloudShell | Python for DS, Math/Stats Foundations, AWS Setup | [M00 Plan](./M00_session_plan.md) |
-| **M01** | *[Module 01 Title]* | *[Services]* | *[Key Focus]* | [M01 Plan](./M01_session_plan.md) |
-| **M02** | *[Module 02 Title]* | *[Services]* | *[Key Focus]* | [M02 Plan](./M02_session_plan.md) |
-| **M03** | *[Module 03 Title]* | *[Services]* | *[Key Focus]* | [M03 Plan](./M03_session_plan.md) |
-| **M04** | *[Module 04 Title]* | *[Services]* | *[Key Focus]* | [M04 Plan](./M04_session_plan.md) |
-| **M05** | *[Module 05 Title]* | *[Services]* | *[Key Focus]* | [M05 Plan](./M05_session_plan.md) |
-| **M06** | *[Module 06 Title]* | *[Services]* | *[Key Focus]* | [M06 Plan](./M06_session_plan.md) |
-| **M07** | *[Module 07 Title]* | *[Services]* | *[Key Focus]* | [M07 Plan](./M07_session_plan.md) |
-| **M08** | *[Module 08 Title]* | *[Services]* | *[Key Focus]* | [M08 Plan](./M08_session_plan.md) |
-| **M09** | *[Module 09 Title]* | *[Services]* | *[Key Focus]* | [M09 Plan](./M09_session_plan.md) |
-| **M10** | *[Module 10 Title]* | *[Services]* | *[Key Focus]* | [M10 Plan](./M10_session_plan.md) |
-| **M11** | *[Module 11 Title]* | *[Services]* | *[Key Focus]* | [M11 Plan](./M11_session_plan.md) |
-| **M12** | Dedicated Capstone Project | Full AWS ML Stack | End-to-End Enterprise Implementation & Defense | [M12 Plan](./M12_session_plan.md) |
+| **M00** | Foundations of Data Science | Python 3.12+, NumPy, SciPy, Git, `uv`, `pytest` | Python Core & Memory, Linear Algebra, Probability & Inference, Software Engineering Workflows | [M00 Plan](./M00/README.md) |
+| **M01** | Data Ingestion & Storage Architecture on AWS | S3, Lake Formation, AWS Glue Data Catalog, Athena | Object Storage, Data Lakehouse Architecture, Parquet & Partitioning Strategies | [M01 Plan](./M01/README.md) |
+| **M02** | Scalable Data Processing & Transformation | AWS Glue, PySpark, EMR Serverless, Athena | Large-Scale Distributed Transformations, Spark Optimizations, ETL Pipelines | [M02 Plan](./M02/README.md) |
+| **M03** | Data Warehousing & Modern Analytics on AWS | Amazon Redshift, Redshift Spectrum, SQL Analytics | Cloud Data Warehousing, Star/Snowflake Schema, High-Performance Analytics | [M03 Plan](./M03/README.md) |
+| **M04** | Real-Time Streaming & Feature Store Architecture | Amazon Kinesis, MSK (Kafka), SageMaker Feature Store | Streaming Ingestion, Event-Driven Architectures, Online/Offline Feature Stores | [M04 Plan](./M04/README.md) |
+| **M05** | Exploratory Data Analysis & Feature Engineering | SageMaker Studio, SageMaker Processing Jobs, Data Wrangler | Large-Scale EDA, Statistical Profiling, Feature Preprocessing Pipelines | [M05 Plan](./M05/README.md) |
+| **M06** | Classical Machine Learning & Distributed Training | SageMaker Built-in Algorithms, Scikit-learn on AWS, Spot Training | Supervised & Unsupervised Modeling, Distributed Gradient Boosting (XGBoost) | [M06 Plan](./M06/README.md) |
+| **M07** | Hyperparameter Optimization & AutoML | SageMaker HPO, Bayesian Search, SageMaker Autopilot | Automatic Model Tuning, Multi-Objective HPO, Model Registry & Governance | [M07 Plan](./M07/README.md) |
+| **M08** | Deep Learning, NLP & Computer Vision on AWS | PyTorch, SageMaker Distributed Training, Hugging Face on AWS | Neural Networks, Distributed Data Parallel (DDP), Transfer Learning, Transformers | [M08 Plan](./M08/README.md) |
+| **M09** | MLOps: Continuous Integration & Pipeline Orchestration | SageMaker Pipelines, Step Functions, CodePipeline, MLflow | Automated ML Workflows, Versioning, CI/CD for Model Delivery & Artifact Tracking | [M09 Plan](./M09/README.md) |
+| **M10** | Production Model Deployment & Monitoring | SageMaker Real-Time Endpoints, Serverless, Model Monitor, Clarify | Low-Latency Inference, A/B Traffic Shifting, Data Drift & Model Bias Monitoring | [M10 Plan](./M10/README.md) |
+| **M11** | Generative AI, Large Language Models & Bedrock | Amazon Bedrock, LangChain, OpenSearch Vector DB | Foundation Models, Retrieval-Augmented Generation (RAG), Prompt Engineering | [M11 Plan](./M11/README.md) |
+| **M12** | Enterprise Capstone Project & Production Defense | Full AWS ML Stack, Streamlit/FastAPI | End-to-End Enterprise Solution Implementation & Live Architecture Defense | [M12 Plan](./M12/README.md) |
+

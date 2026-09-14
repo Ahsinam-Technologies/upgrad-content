@@ -1,0 +1,567 @@
+% =============================================================================
+% 03_cpython_and_numpy.tex — Slides S01-048 to S01-066
+% Block 3: The CPython Speed Wall & NumPy's Breakthrough
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-048
+% Narrative Role: Block Transition
+% Cognitive Objective: Establish Block 3 goals: CPU bottlenecks, memory buffers, SIMD vectorization, and broadcasting.
+% Plan Source: slide_plan.md / S01-048
+% -----------------------------------------------------------------------------
+\TopicDivider{03}{The CPython Speed Wall \& NumPy}{3 CPU bottlenecks, contiguous C-buffers, SIMD vectorization, and broadcasting.}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-049
+% Narrative Role: Benchmark Hook
+% Cognitive Objective: Expose the staggering performance gap between pure Python and NumPy.
+% Plan Source: slide_plan.md / S01-049
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The 28.5s vs 3.8ms Matrix Multiplication Mystery}
+  \begin{HighlightedCodeBlock}{Python}{2,6}
+# Problem: Multiply two 1,000 x 1,000 float64 matrices
+# Method A: Pure Python nested loops
+for i in range(1000):
+    for j in range(1000):
+        for k in range(1000):
+            C[i][j] += A[i][k] * B[k][j]  # Takes 28.500 seconds!
+
+# Method B: NumPy Vectorized Matmul
+C = A @ B  # Takes 0.0038 seconds (3.8 milliseconds)!
+  \end{HighlightedCodeBlock}
+  \vfill
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \StatCard{UpGradRed}{28.50 s}{Pure Python Loops}{Interpreted bytecodes \& pointer dereferencing}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \StatCard{AWSEmerald}{3.8 ms}{NumPy Vectorized C}{7,500x Faster on identical CPU hardware!}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-050
+% Narrative Role: Prediction Prompt
+% Cognitive Objective: Predict memory consumption and execution mechanics of a Python list vs NumPy array.
+% Plan Source: slide_plan.md / S01-050
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Prediction Task 3: Memory Footprint \& Loop Overhead}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.52\textwidth}
+      \begin{CodeBlock}{Python}
+# 10 Million Integers in Python:
+lst = [x * 2 for x in range(10_000_000)]
+
+# 10 Million Integers in NumPy:
+arr = np.arange(10_000_000, dtype=np.int64) * 2
+      \end{CodeBlock}
+      \vspace{0.08cm}
+      \begin{QuestionBox}{Predict the Key Differences}
+        \begin{enumerate}\setlength{\itemsep}{0.08cm}
+          \item How much RAM does \InlineCode{lst} use vs \InlineCode{arr}?
+          \item Why is \InlineCode{arr * 2} executed $400\times$ faster than the list comprehension?
+        \end{enumerate}
+      \end{QuestionBox}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{ConceptBox}{Core Hypotheses}
+        \begin{itemize}\setlength{\itemsep}{0.08cm}
+          \item \textbf{Hypothesis A:} NumPy is written in C and skips Python bytecode.
+          \item \textbf{Hypothesis B:} Memory layout is fundamentally different in RAM.
+          \item \textbf{Hypothesis C:} CPU hardware vector registers execute parallel math.
+        \end{itemize}
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-051
+% Narrative Role: Mechanistic Diagram
+% Cognitive Objective: Understand the massive memory bloat of pointer arrays pointing to boxed PyObject structs.
+% Plan Source: slide_plan.md / S01-051
+% -----------------------------------------------------------------------------
+\begin{frame}{Bottleneck 1: Boxed Objects vs Unboxed Primitive Memory}
+  \begin{center}
+    \DrawMemoryLayoutComparison
+  \end{center}
+  \vfill
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{Python List: 360 MB Total}
+        \scriptsize 80 MB for the pointer array + 280 MB for 10M scattered 28-byte \InlineCode{PyLongObject} structs across fragmented RAM.
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{NumPy ndarray: 80 MB Total}
+        \scriptsize Zero boxed object headers! A single flat contiguous C-buffer storing 10M raw 8-byte 64-bit integers ($4.5\times$ memory reduction).
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-052
+% Narrative Role: Hardware Architecture Deep-Dive
+% Cognitive Objective: Connect Python heap pointer fragmentation to hardware L1/L2 cache misses.
+% Plan Source: slide_plan.md / S01-052
+% -----------------------------------------------------------------------------
+\begin{frame}{Bottleneck 2: Pointer Chasing \& CPU Cache Misses}
+  \CompareGrid{Python Pointer Chasing (Cache Thrashing)}{
+    \begin{itemize}\setlength{\itemsep}{0.06cm}
+      \item Elements are scattered unpredictably across DRAM.
+      \item CPU must dereference pointers one-by-one.
+      \item Causes constant \textbf{L1/L2 Cache Misses}.
+      \item CPU stalls for 200+ cycles per item waiting for RAM!
+    \end{itemize}
+  }{NumPy Contiguous Locality (Cache Prefetch)}{
+    \begin{itemize}\setlength{\itemsep}{0.06cm}
+      \item Elements sit in adjacent physical memory bytes.
+      \item Hardware prefetcher loads contiguous 64-byte \textbf{L1 Cache Lines} ahead of time.
+      \item 100\% Cache Hits; CPU processes data in 4 cycles!
+    \end{itemize}
+  }
+  \vspace{0.18cm}
+  \TakeawayBanner{CPUs operate at maximum speed when memory is sequentially contiguous and predictable.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-053
+% Narrative Role: Interpreter Mechanics
+% Cognitive Objective: Realize that pure Python checks types and dispatches methods on every loop iteration.
+% Plan Source: slide_plan.md / S01-053
+% -----------------------------------------------------------------------------
+\begin{frame}{Bottleneck 3: Dynamic Type Dispatch \& Bytecode Evaluation}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{tcolorbox}[enhanced,arc=1.2mm,boxrule=.4pt,colback=UpGradRed!8,colframe=UpGradRed,title={\bfseries\scriptsize Pure Python: 6 Steps per Addition $\times$ 10M},coltitle=white]
+        \scriptsize
+        \begin{enumerate}\setlength{\itemsep}{0.04cm}
+          \item Fetch bytecode instruction \InlineCode{BINARY\_OP}.
+          \item Inspect \InlineCode{ob\_type*} of element $A$.
+          \item Look up \InlineCode{\_\_add\_\_} method in dict.
+          \item Typecheck element $B$.
+          \item Allocate new \InlineCode{PyLongObject} on heap.
+          \item Update reference counts.
+        \end{enumerate}
+      \end{tcolorbox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{tcolorbox}[enhanced,arc=1.2mm,boxrule=.4pt,colback=AWSEmerald!8,colframe=AWSEmerald,title={\bfseries\scriptsize NumPy: Single Compiled C-Loop},coltitle=white]
+        \scriptsize
+        \begin{itemize}\setlength{\itemsep}{0.08cm}
+          \item Dtype is verified \textbf{once} before the loop starts.
+          \item Executes single hardware assembly \InlineCode{ADD} instruction directly in CPU registers.
+          \item Zero bytecode interpreter evaluations.
+          \item Zero dynamic type lookups.
+        \end{itemize}
+      \end{tcolorbox}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{NumPy eliminates dynamic dispatch by fixing homogeneous datatypes across the array.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-054
+% Narrative Role: Architectural Breakdown
+% Cognitive Objective: Master the separation between metadata header and contiguous raw data buffer.
+% Plan Source: slide_plan.md / S01-054
+% -----------------------------------------------------------------------------
+\begin{frame}{The Anatomy of a NumPy \texttt{ndarray}}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.42\textwidth}
+      \begin{tcolorbox}[enhanced,arc=1.2mm,boxrule=.4pt,colback=UpGradNight,colframe=AWSSquid,title={\bfseries\scriptsize Array Metadata Header (Python)},coltitle=white]
+        \scriptsize\ttfamily\color{UpGradMist}
+        \textbf{data\_ptr:} 0x7ffee00\\[2pt]
+        \textbf{dtype:}    float64 (8 bytes)\\[2pt]
+        \textbf{shape:}    (3, 4)\\[2pt]
+        \textbf{strides:}  (32, 8)\\[2pt]
+        \textbf{ndim:}     2\\[2pt]
+        \textbf{flags:}    C\_CONTIGUOUS
+      \end{tcolorbox}
+    \end{column}
+    \begin{column}{0.55\textwidth}
+      \begin{tcolorbox}[enhanced,arc=1.2mm,boxrule=.4pt,colback=AWSEmerald!8,colframe=AWSEmerald,title={\bfseries\scriptsize Raw Data Buffer (C Memory Block at 0x7ffee00)},coltitle=white]
+        \scriptsize
+        Flat contiguous buffer of 96 bytes (12 float64 values):\\[4pt]
+        \InlineCode{[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]}
+      \end{tcolorbox}
+      \vspace{0.08cm}
+      {\scriptsize\color{UpGradSlate}The metadata header interprets the flat 1D memory buffer as a 2D matrix!}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{An \InlineCode{ndarray} is a lightweight Python metadata descriptor wrapping a raw C memory block.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-055
+% Narrative Role: Hardware Deep-Dive
+% Cognitive Objective: Visualize Single Instruction Multiple Data (SIMD) executing 8 operations in 1 cycle.
+% Plan Source: slide_plan.md / S01-055
+% -----------------------------------------------------------------------------
+\begin{frame}{Hardware Parallelism: SIMD Vector Registers (AVX-512)}
+  \begin{center}
+    \DrawSIMDExecutionDiagram
+  \end{center}
+  \vfill
+  \TakeawayBanner{Contiguous, unboxed memory enables SIMD vector units to compute 8 float64 additions in a single clock cycle.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-056
+% Narrative Role: Formal Mathematical Derivation
+% Cognitive Objective: Understand how multi-dimensional coordinates map to flat 1D memory via strides.
+% Plan Source: slide_plan.md / S01-056
+% -----------------------------------------------------------------------------
+\begin{frame}{Multi-Dimensional Indexing \& The Strides Formula}
+  \begin{center}
+    \DrawStridesMappingDiagram
+  \end{center}
+  \vspace{0.06cm}
+  \begin{center}
+    {\fontsize{13}{16}\selectfont\color{UpGradNight}\(\displaystyle \text{Address}(i, j) = \text{data\_ptr} + (i \cdot s_0) + (j \cdot s_1)\)}\par\vspace{0.08cm}
+    {\scriptsize\color{UpGradSlate}For shape $(3, 4)$ and float64: row stride $s_0 = 4 \times 8 = 32\text{B}$, column stride $s_1 = 1 \times 8 = 8\text{B}$}
+  \end{center}
+  \vfill
+  \TakeawayBanner{Multi-dimensional indexing is pure arithmetic: NumPy maps 2D $(i, j)$ coordinates to 1D RAM byte offsets instantly.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-057
+% Narrative Role: Mechanistic Diagram
+% Cognitive Objective: Understand why transposing and basic slicing take 0.000 ms (Zero-Copy Views).
+% Plan Source: slide_plan.md / S01-057
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Zero-Copy Transpose \& Slicing: The Power of Views}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{CodeBlock}{Python}
+A = np.ones((3, 4))
+# A.shape   = (3, 4)
+# A.strides = (32, 8)
+
+B = A.T  # Transpose!
+# B.shape   = (4, 3)
+# B.strides = (8, 32)
+# Runtime: 0.0000s (Zero Copy!)
+      \end{CodeBlock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{How Zero-Copy Transpose Works}
+        \scriptsize
+        \begin{itemize}\setlength{\itemsep}{0.08cm}
+          \item NumPy does NOT rearrange the 96-byte memory buffer!
+          \item It constructs a new 64-byte metadata header pointing to the \textbf{exact same memory buffer}.
+          \item It simply swaps the strides from \InlineCode{(32, 8)} to \InlineCode{(8, 32)}!
+        \end{itemize}
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{Transposing a 10 GB array in NumPy takes 0.000 milliseconds because zero data is copied.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-058
+% Narrative Role: Warning / Failure Mode
+% Cognitive Objective: Differentiate when NumPy creates a zero-copy view vs an independent memory copy.
+% Plan Source: slide_plan.md / S01-058
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{The Mutation Trap: Views vs Copies}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{UpGradRed}Basic Slicing (Creates a VIEW!)}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+a = np.array([1, 2, 3, 4])
+b = a[::2]   # Basic Slice -> VIEW!
+b[0] = 999   # Mutate slice...
+
+print("a:", a) # [999, 2, 3, 4]!
+# CRITICAL: a was mutated!
+      \end{CodeBlock}
+      \vspace{0.04cm}
+      {\tiny\color{UpGradRedDark}*Shares underlying memory buffer (\InlineCode{b.base is a}).}
+    \end{column}
+    \hfill{\color{UpGradRule}\vrule width .5pt}\hfill
+    \begin{column}{0.48\textwidth}
+      {\small\bfseries\color{AWSEmerald}Fancy / Boolean Indexing (Creates a COPY!)}\par\vspace{0.08cm}
+      \begin{CodeBlock}{Python}
+a = np.array([1, 2, 3, 4])
+c = a[a > 2] # Boolean Index -> COPY!
+c[0] = 999   # Mutate copy...
+
+print("a:", a) # [1, 2, 3, 4] (Intact!)
+# a was NOT mutated!
+      \end{CodeBlock}
+      \vspace{0.04cm}
+      {\tiny\color{AWSEmerald}*Allocates a fresh memory buffer (\InlineCode{c.base is None}).}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{Basic slicing returns a memory view; fancy indexing always allocates a fresh copy.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-059
+% Narrative Role: Problem Setup
+% Cognitive Objective: Understand why adding arrays of different shapes is required in data normalization.
+% Plan Source: slide_plan.md / S01-059
+% -----------------------------------------------------------------------------
+\begin{frame}{The NumPy Broadcasting Engine: The Problem}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{The Machine Learning Task}
+        \scriptsize We have a feature matrix $X$ with 1,000 samples and 50 features (\InlineCode{shape = (1000, 50)}), and a mean vector $\mu$ with 50 feature averages (\InlineCode{shape = (50,)}).
+      \end{ConceptBox}
+      \vspace{0.10cm}
+      \begin{WarningBox}{The Naive Dilemma}
+        \scriptsize
+        \begin{itemize}
+          \item Pure Python loop: Takes 150 ms.
+          \item Duplicating $\mu$ 1,000 times: Wastes RAM.
+        \end{itemize}
+      \end{WarningBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        \begin{tikzpicture}[font=\scriptsize\bfseries]
+          \node[draw=UpGradNight,fill=UpGradMist,minimum width=2.4cm,minimum height=2.0cm,align=center] (X) at (0,0) {
+            X: (1000, 50)\\ \tiny Feature Matrix
+          };
+          \node at (1.8,0) {\Large -};
+          \node[draw=AWSBlue,fill=AWSBlue!10,minimum width=2.4cm,minimum height=0.6cm,align=center] (mu) at (3.6,0) {
+            $\mu$: (50,)\\ \tiny Mean Vector
+          };
+        \end{tikzpicture}
+      \end{center}
+      \vspace{0.10cm}
+      {\scriptsize\color{UpGradSlate}How can NumPy compute $X - \mu$ without allocating extra memory for $\mu$?}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-060
+% Narrative Role: Formal Rules / Blueprint
+% Cognitive Objective: Master the mathematical compatibility rules for multi-dimensional array broadcasting.
+% Plan Source: slide_plan.md / S01-060
+% -----------------------------------------------------------------------------
+\begin{frame}{The 2 Golden Invariants of Broadcasting}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{Rule 1: Right-to-Left Alignment}
+        \scriptsize Compare array shapes starting from the \textbf{trailing (rightmost) dimension} and move left.
+      \end{ConceptBox}
+      \vspace{0.10cm}
+      \begin{ConceptBox}{Rule 2: Dimension Compatibility}
+        \scriptsize Two dimensions are compatible if:
+        \begin{enumerate}\setlength{\itemsep}{0.04cm}
+          \item They are equal, \textbf{OR}
+          \item One of them is \textbf{1}.
+        \end{enumerate}
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{tcolorbox}[enhanced,arc=1.2mm,boxrule=.4pt,colback=UpGradNight,colframe=AWSSquid,title={\bfseries\scriptsize Trailing Dimension Alignment},coltitle=white]
+        \ttfamily\scriptsize\color{UpGradMist}
+        Array A:  (4,  1,  8)\\[2pt]
+        Array B:      (6,  8)  $\to$ Pad to (1, 6, 8)\\[2pt]
+        \textcolor{UpGradRed}{\rule{4.5cm}{0.4pt}}\\[2pt]
+        Result:   (4,  6,  8)  \color{AWSEmerald}\bfseries(COMPATIBLE!)
+      \end{tcolorbox}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \TakeawayBanner{If dimensions match or one is 1, NumPy broadcasts; otherwise it raises a \InlineCode{ValueError}.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-061
+% Narrative Role: VM Internals / Mechanism
+% Cognitive Objective: Understand that broadcasting sets stride = 0 to reuse memory addresses.
+% Plan Source: slide_plan.md / S01-061
+% -----------------------------------------------------------------------------
+\begin{frame}{Virtual Strides: Broadcasting with Zero Extra Memory}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{The Zero-Stride Trick}
+        \scriptsize
+        To broadcast a vector of shape \InlineCode{(1, 4)} across 1,000 rows into shape \InlineCode{(1000, 4)}:
+        \begin{itemize}\setlength{\itemsep}{0.08cm}
+          \item NumPy sets the row stride to \textbf{0 bytes}: \InlineCode{strides = (0, 8)}.
+          \item Moving to row $i+1$ adds $0 \times 0 = 0\text{ bytes}$!
+          \item The CPU reads the exact same 4 numbers across all 1,000 rows.
+        \end{itemize}
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{center}
+        \begin{tikzpicture}[font=\ttfamily\scriptsize,scale=0.85,transform shape]
+          \node[draw=AWSBlue,fill=AWSBlue!10,rounded corners=1mm,thick,minimum width=4.0cm,minimum height=0.65cm] at (0,1.5) {
+            Buffer: [10, 20, 30, 40]
+          };
+          \draw[->,UpGradRed,thick] (0,1.0) -- (0,0.4);
+          \node[draw=AWSEmerald,fill=AWSEmerald!15,rounded corners=1mm,thick,minimum width=4.0cm,minimum height=0.65cm] at (0,0) {
+            Virtual 1000x4 Matrix (stride=0)
+          };
+        \end{tikzpicture}
+      \end{center}
+      \StatCard{AWSEmerald}{0 Bytes}{Extra Memory}{Zero data duplication in RAM}
+    \end{column}
+  \end{columns}
+  \vspace{0.08cm}
+  \TakeawayBanner{Broadcasting creates virtual multi-dimensional expansions using \InlineCode{stride = 0}.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-062
+% Narrative Role: Warning / Anti-Pattern
+% Cognitive Objective: Prevent accidental 2D outer product expansions that exhaust RAM.
+% Plan Source: slide_plan.md / S01-062
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Failure Mode: Accidental Broadcasting Memory Explosion}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{HighlightedCodeBlock}{Python}{3}
+a = np.ones((100_000, 1)) # Column vector
+b = np.ones((1, 100_000)) # Row vector
+c = a + b # Unintended Outer Product!
+      \end{HighlightedCodeBlock}
+      \vspace{0.08cm}
+      \begin{WarningBox}{The 80 GB RAM Blowup}
+        \scriptsize
+        \InlineCode{(100000, 1) + (1, 100000)} yields shape \InlineCode{(100000, 100000)}.
+        $10^{10}\text{ elements} \times 8\text{ bytes} = \mathbf{80\text{ GB RAM!}}$
+      \end{WarningBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \StatCard{UpGradRed}{80 GB RAM}{Accidental Outer Broadcast}{Triggers instant OS kernel crash!}
+      \vspace{0.10cm}
+      \begin{ConceptBox}{Defensive Invariant}
+        \scriptsize Always verify array shapes with \InlineCode{a.shape} and \InlineCode{b.shape} before applying arithmetic operators.
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-063
+% Narrative Role: Production Code Walkthrough
+% Cognitive Objective: Build an enterprise-scale Min-Max & Z-Score feature scaling pipeline.
+% Plan Source: slide_plan.md / S01-063
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Authentic Application: Vectorized Feature Normalizer}
+  \begin{HighlightedCodeBlock}{Python}{6,7,12}
+class VectorizedStandardScaler:
+    def __init__(self):
+        self.mean_: np.ndarray | None = None
+        self.std_:  np.ndarray | None = None
+
+    def fit(self, X: np.ndarray) -> "VectorizedStandardScaler":
+        self.mean_ = np.mean(X, axis=0) # Shape: (D,)
+        self.std_  = np.std(X, axis=0)  # Shape: (D,)
+        self.std_[self.std_ == 0.0] = 1.0 # Prevent div by zero
+        return self
+
+    def transform(self, X: np.ndarray) -> np.ndarray:
+        # Zero-loop broadcasting: (N, D) - (D,) / (D,) in SIMD registers
+        return (X - self.mean_) / self.std_
+  \end{HighlightedCodeBlock}
+  \vfill
+  \TakeawayBanner{Scales 1,000,000 rows $\times$ 50 features in under 8 ms via pure vectorized broadcasting.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-064
+% Narrative Role: Interactive Exercise
+% Cognitive Objective: Vectorize Euclidean distance computation between M points and N centroids in R^d.
+% Plan Source: slide_plan.md / S01-064
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Transfer Challenge 3: Pairwise Distances Without Loops}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.52\textwidth}
+      \begin{CodeBlock}{Python}
+# Input Shapes:
+# X: Shape (M, d) -> M data points in R^d
+# C: Shape (N, d) -> N cluster centroids
+
+# Goal: Compute Distance Matrix D (M, N)
+# where D[i, j] = || x_i - c_j ||_2
+      \end{CodeBlock}
+      \vspace{0.08cm}
+      \begin{ConceptBox}{The Challenge}
+        \scriptsize How can we reshape $X$ and $C$ to compute all $M \times N$ pairwise Euclidean distances with zero Python loops?
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{QuestionBox}{Which Reshaping Strategy?}
+        \begin{itemize}\setlength{\itemsep}{0.08cm}
+          \item[\textbf{A)}] \InlineCode{X (M, 1, d)} and \InlineCode{C (1, N, d)}
+          \item[\textbf{B)}] \InlineCode{X (M, d, 1)} and \InlineCode{C (N, d, 1)}
+          \item[\textbf{C)}] \InlineCode{X (1, M, d)} and \InlineCode{C (N, 1, d)}
+        \end{itemize}
+      \end{QuestionBox}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-065
+% Narrative Role: Solution / Mathematical Code
+% Cognitive Objective: Master 3D array broadcasting for machine learning distance calculations.
+% Plan Source: slide_plan.md / S01-065
+% -----------------------------------------------------------------------------
+\begin{frame}[fragile]{Transfer Challenge 3: Solution \& 3D Broadcasting}
+  \begin{HighlightedCodeBlock}{Python}{2,3,6}
+# 1. Expand dimensions to trigger 3D broadcast:
+# X[:, None, :] -> Shape (M, 1, d)
+# C[None, :, :] -> Shape (1, N, d)
+
+# 2. Subtract & compute Euclidean norm along feature axis:
+distances = np.linalg.norm(X[:, None, :] - C[None, :, :], axis=2)
+# Result: Shape (M, N) distance matrix computed in SIMD C-registers!
+  \end{HighlightedCodeBlock}
+  \vfill
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \StatCard{AWSEmerald}{1 Line of Code}{Vectorized Distance}{Zero nested Python loops}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \StatCard{AWSBlue}{(M, N, d)}{Broadcast Tensor}{Simultaneous $M \times N$ vector differences}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+% Slide ID: S01-066
+% Narrative Role: Synthesis
+% Cognitive Objective: Consolidate the architectural principles of high-performance array computing.
+% Plan Source: slide_plan.md / S01-066
+% -----------------------------------------------------------------------------
+\begin{frame}{Block 3 Synthesis: Escaping the CPython Speed Wall}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{1. Contiguous Homogeneous Buffers}
+        \scriptsize Eliminates boxed \InlineCode{PyObject} headers, pointer chasing, and heap fragmentation.
+      \end{ConceptBox}
+      \vspace{0.08cm}
+      \begin{ConceptBox}{2. Hardware SIMD Parallelism}
+        \scriptsize AVX-512 vector registers process 8 float64 calculations in a single CPU clock cycle.
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{ConceptBox}{3. Strides \& Zero-Copy Views}
+        \scriptsize Slicing and transposing operate in 0.000s by manipulating metadata headers rather than data.
+      \end{ConceptBox}
+      \vspace{0.08cm}
+      \begin{ConceptBox}{4. Zero-Memory Broadcasting}
+        \scriptsize Expands virtual dimensions via \InlineCode{stride = 0} without duplicating data in RAM.
+      \end{ConceptBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{NumPy achieves native C-speed by bypassing Python objects and computing on contiguous memory.}
+\end{frame}
