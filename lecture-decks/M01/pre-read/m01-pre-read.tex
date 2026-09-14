@@ -1,0 +1,41 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usepackage{upgradbeamer}
+\author{UpGrad Learning Team}
+\date{}
+
+\begin{document}
+\UpGradTitleSlide{Pre-read: the data-engineering mental model on AWS}{Prepare for M01}{M01}{Pre-read}
+
+\begin{frame}{Why read this before the module?}
+  \begin{LearningObjectives}{Come prepared to}
+    \begin{itemize}
+      \item distinguish storage, compute, cataloguing and querying responsibilities;
+      \item recognise the trade-off between exploratory convenience and reproducible pipelines; and
+      \item bring one data source from your work context to map onto the architecture.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+\begin{frame}{Four responsibilities, not four interchangeable tools}
+  \small
+  \begin{UpGradTable}{>{\raggedright\arraybackslash}p{.20\linewidth} >{\raggedright\arraybackslash}p{.22\linewidth} X}
+    \TableHeaderRow \TableHead{Responsibility} & \TableHead{Typical AWS service} & \TableHead{Question to ask} \\
+    Store source data & Amazon S3 & What is immutable, and what is the retention policy? \\
+    Discover schema & AWS Glue Data Catalog & Which table definition is trusted by downstream users? \\
+    Transform at scale & AWS Glue / EMR & Can the job be rerun from versioned inputs? \\
+    Query interactively & Amazon Athena & Who can query which prefix, and at what cost? \\
+  \end{UpGradTable}
+\end{frame}
+
+\begin{frame}{Reading prompt}
+  \begin{QuestionBox}{Map one data flow}
+    Choose a source you know: product events, orders or support tickets. Where would raw objects land? What creates a curated table? Which team owns the schema? Write down one uncertainty to bring to Session 01.
+  \end{QuestionBox}
+\end{frame}
+
+\begin{frame}{Key takeaway}
+  \begin{TakeawayBox}{Design for the next question}
+    A useful data platform preserves raw evidence, makes curated data discoverable and lets transformations be rerun when the business question changes.
+  \end{TakeawayBox}
+\end{frame}
+\end{document}

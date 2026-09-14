@@ -1,0 +1,337 @@
+% upgradbeamer.sty — shared, content-first Beamer presentation layer.
+% Keep visual decisions here; individual decks should contain teaching content.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{upgradbeamer}[2026/09/14 UpGrad lecture-deck framework]
+\newif\ifUpGradScience
+\DeclareOption{science}{\UpGradSciencetrue}
+\ProcessOptions\relax
+
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
+\RequirePackage{microtype}
+\RequirePackage{xcolor}
+\RequirePackage{graphicx}
+\RequirePackage{booktabs}
+\RequirePackage{array}
+\RequirePackage{colortbl}
+\RequirePackage{tabularx}
+\RequirePackage{tikz}
+\RequirePackage{pgfplots}
+\ifUpGradScience
+  \RequirePackage{siunitx}
+  \RequirePackage{tikz-3dplot}
+  \RequirePackage{circuitikz}
+  \RequirePackage{chemfig}
+\fi
+\RequirePackage{tcolorbox}
+\RequirePackage{environ}
+\RequirePackage{listings}
+\RequirePackage{etoolbox}
+\RequirePackage{overpic}
+\RequirePackage{hyperref}
+
+\usetikzlibrary{arrows.meta,backgrounds,calc,decorations.pathreplacing,positioning,shapes.geometric}
+\pgfplotsset{compat=1.18}
+\ifUpGradScience\sisetup{detect-all,output-decimal-marker={.}}\fi
+\tcbuselibrary{skins}
+
+% A small compatibility-safe adaptation of lstlinebgrd. The TeX Live add-on
+% shipped here still uses an obsolete listings key syntax; defining the four
+% keys locally gives the same full-line highlighting without a fragile version pin.
+\makeatletter
+\lst@Key{numbers}{none}{%
+  \def\lst@PlaceNumber{\lst@linebgrd}%
+  \lstKV@SwitchCases{#1}{%
+    none:\\%
+    left:\def\lst@PlaceNumber{\llap{\normalfont\lst@numberstyle{\thelstnumber}\kern\lst@numbersep}\lst@linebgrd}\\%
+    right:\def\lst@PlaceNumber{\rlap{\normalfont\kern\linewidth\kern\lst@numbersep\lst@numberstyle{\thelstnumber}}\lst@linebgrd}%
+  }{\PackageError{Listings}{Numbers #1 unknown}\@ehc}}
+\lst@Key{linebackgroundcolor}{}{\def\lst@linebgrdcolor{#1}}
+\lst@Key{linebackgroundsep}{0pt}{\def\lst@linebgrdsep{#1}}
+\lst@Key{linebackgroundwidth}{\linewidth}{\def\lst@linebgrdwidth{#1}}
+\lst@Key{linebackgroundheight}{\ht\strutbox}{\def\lst@linebgrdheight{#1}}
+\lst@Key{linebackgrounddepth}{\dp\strutbox}{\def\lst@linebgrddepth{#1}}
+\lst@Key{linebackgroundcmd}{\color@block}{\def\lst@linebgrdcmd{#1}}
+\newcommand{\lst@linebgrd}{%
+  \ifx\lst@linebgrdcolor\empty\else
+    \rlap{\lst@basicstyle\color{-.}\lst@linebgrdcolor{%
+      \kern-\dimexpr\lst@linebgrdsep\relax
+      \lst@linebgrdcmd{\lst@linebgrdwidth}{\lst@linebgrdheight}{\lst@linebgrddepth}}}%
+  \fi}
+\makeatother
+
+% Brand / accessibility palette. The red is sampled from the current official
+% upGrad wordmark; neutral colours deliberately keep long technical decks calm.
+\definecolor{UpGradRed}{HTML}{EE2F3D}
+\definecolor{UpGradRedDark}{HTML}{C71F31}
+\definecolor{UpGradInk}{HTML}{1E2530}
+\definecolor{UpGradDeep}{HTML}{131A24}
+\definecolor{UpGradSlate}{HTML}{596575}
+\definecolor{UpGradMuted}{HTML}{788492}
+\definecolor{UpGradRule}{HTML}{DCE1E7}
+\definecolor{UpGradMist}{HTML}{F5F7F9}
+\definecolor{UpGradCanvas}{HTML}{FCFCFB}
+\definecolor{UpGradCode}{HTML}{F4F6F8}
+\definecolor{UpGradCodeHighlight}{HTML}{FDE8EA}
+\definecolor{UpGradGreen}{HTML}{167D63}
+\definecolor{UpGradAmber}{HTML}{A76100}
+\definecolor{UpGradBlue}{HTML}{195C9B}
+
+\hypersetup{colorlinks=true,urlcolor=UpGradBlue,linkcolor=UpGradRed,citecolor=UpGradBlue}
+\renewcommand{\familydefault}{\sfdefault}
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+\setbeamersize{text margin left=0.72cm,text margin right=0.72cm}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize item}{\raise0.15ex\hbox{\tiny\textcolor{UpGradRed}{\textbullet}}}
+\setbeamertemplate{itemize subitem}{\raise0.15ex\hbox{\scriptsize\textcolor{UpGradSlate}{\textbullet}}}
+\setbeamertemplate{enumerate item}{\color{UpGradRed}\insertenumlabel.}
+\setbeamertemplate{caption}[numbered]
+\setbeamertemplate{blocks}[rounded]
+\setbeamercolor{normal text}{fg=UpGradInk,bg=UpGradCanvas}
+\setbeamercolor{frametitle}{fg=UpGradInk,bg=UpGradCanvas}
+\setbeamerfont{frametitle}{series=\bfseries,size=\Large}
+\setbeamerfont{normal text}{size=\normalsize}
+\setbeamerfont{caption}{size=\scriptsize}
+\setbeamercolor{caption name}{fg=UpGradSlate}
+
+% Deck metadata is set once in a preamble and used by title and footer.
+\newcommand{\UpGradModule}{}
+\newcommand{\UpGradDeckKind}{}
+\newcommand{\DeckMetadata}[2]{\gdef\UpGradModule{#1}\gdef\UpGradDeckKind{#2}}
+\newcommand{\UpGradWordmark}{{\fontsize{13}{13}\selectfont\bfseries\textcolor{UpGradRed}{upGrad}}}
+
+\setbeamertemplate{frametitle}{%
+  \vspace{0.17cm}\makebox[\textwidth][r]{\scriptsize\color{UpGradMuted}\UpGradModule\ifstrempty{\UpGradDeckKind}{}{\enspace/\enspace\UpGradDeckKind}}\par
+  \vspace{0.03cm}\strut\insertframetitle\par
+  \vspace{0.10cm}\textcolor{UpGradRed}{\rule{1.05cm}{1.4pt}}\textcolor{UpGradRule}{\rule{\dimexpr\textwidth-1.05cm\relax}{0.35pt}}\vspace{-0.04cm}
+}
+\setbeamertemplate{footline}{%
+  \leavevmode\hbox{%
+    \begin{beamercolorbox}[wd=.76\paperwidth,ht=0.34cm,dp=0.13cm,leftskip=.72cm]{author in head/foot}%
+      \scriptsize\color{UpGradSlate}\UpGradModule\ifstrempty{\UpGradDeckKind}{}{\enspace|\enspace\UpGradDeckKind}%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.24\paperwidth,ht=0.34cm,dp=0.13cm,rightskip=.72cm plus1fill]{date in head/foot}%
+      \scriptsize\color{UpGradSlate}\insertframenumber\,/\,\inserttotalframenumber\hfill\UpGradWordmark
+    \end{beamercolorbox}%
+  }\vskip0.14cm%
+}
+
+\setbeamercolor{title page}{bg=UpGradDeep}
+\setbeamertemplate{title page}{%
+  \begin{beamercolorbox}[wd=\paperwidth,ht=\paperheight,sep=0pt]{title page}%
+    \begin{tikzpicture}[remember picture,overlay]
+      \fill[UpGradRed] (current page.north west) rectangle ([xshift=.17cm]current page.south west);
+      \draw[UpGradSlate!35!UpGradDeep,line width=.35pt] ([xshift=14.85cm,yshift=-.72cm]current page.north west) -- ([xshift=14.85cm,yshift=-7.02cm]current page.north west);
+      \fill[UpGradRed] ([xshift=14.85cm,yshift=-6.98cm]current page.north west) rectangle ([xshift=15.75cm,yshift=-7.02cm]current page.north west);
+    \end{tikzpicture}%
+    \vspace*{0.66cm}\hspace*{0.72cm}\UpGradWordmark
+    \vfill
+    \hspace*{0.72cm}{\color{UpGradRed}\rule{1.35cm}{2.2pt}}\par\vspace{0.30cm}
+    \hspace*{0.72cm}\begin{minipage}{0.70\paperwidth}\raggedright
+      {\fontsize{25}{30}\selectfont\bfseries\color{white}\inserttitle\par}
+      \vspace{0.28cm}{\large\color{UpGradRule}\insertsubtitle\par}
+    \end{minipage}
+    \vfill
+    \hspace*{0.72cm}\vspace*{0.68cm}
+  \end{beamercolorbox}%
+}
+
+% \UpGradTitleSlide{title}{subtitle}{module}{deck kind}
+\newcommand{\UpGradTitleSlide}[4]{%
+  \title{#1}\subtitle{#2}\DeckMetadata{#3}{#4}%
+  \begin{frame}[plain]\titlepage\end{frame}%
+}
+% Used only where the source curriculum has not yet approved deck content.
+% It creates an honest, compilable hand-off deck without inventing instruction.
+\newcommand{\ContentPendingDeck}[2]{%
+  \UpGradTitleSlide{#1: #2}{Instructional content pending approval}{#1}{#2}%
+  \begin{frame}{Content status}
+    \begin{WarningBox}{No approved lesson material was supplied}
+      This deck is intentionally a source-and-PDF scaffold. Replace it with reviewed learning objectives, examples, exercises and references before learner delivery.
+    \end{WarningBox}
+  \end{frame}%
+  \begin{frame}{Author handoff}
+    \begin{itemize}
+      \item Start from the approved session plan and define observable learning objectives.
+      \item Add session-local assets under \InlineCode{assets/}; keep reusable components in the shared theme.
+      \item Compile with \InlineCode{make deck DECK=...} and review the resulting PDF before release.
+    \end{itemize}
+  \end{frame}%
+}
+
+% Section / agenda primitives.
+\newcommand{\AgendaSlide}[1]{%
+  \begin{frame}{Today}\small #1\end{frame}%
+}
+% A topic is the independently compilable unit inside a session. Put one
+% \TopicEntry per item inside \SessionTopicsSlide, then use \TopicDivider at
+% the beginning of each topic source.
+\newcommand{\TopicEntry}[3]{\item[] \textcolor{UpGradRed}{\bfseries #1}\hspace{.35em}\textbf{#2}\par\scriptsize\color{UpGradSlate}#3\normalsize\vspace{.28cm}}
+\newcommand{\SessionTopicsSlide}[1]{%
+  \begin{frame}{Session map}
+    \vspace{.08cm}\small\begin{enumerate}\setlength{\itemsep}{.18cm}#1\end{enumerate}
+    \vfill\Citation{Each topic can be compiled alone while this session file assembles the complete learner deck.}
+  \end{frame}%
+}
+\newcommand{\TopicDivider}[3]{%
+  {\setbeamercolor{background canvas}{bg=UpGradDeep}%
+  \begin{frame}[plain]
+    \vspace*{.72cm}\hspace*{.72cm}{\color{UpGradRed}\bfseries\large TOPIC\enspace#1}\par
+    \vfill\hspace*{.72cm}\begin{minipage}{.80\paperwidth}
+      {\fontsize{29}{34}\selectfont\bfseries\color{white}#2\par}\vspace{.26cm}
+      {\large\color{UpGradRule}#3\par}
+    \end{minipage}\vfill
+    \hspace*{.72cm}{\scriptsize\color{UpGradMist}\UpGradModule\enspace/\enspace\UpGradDeckKind}\vspace*{.58cm}
+  \end{frame}}%
+}
+% This intentionally emits a title slide only when the topic is compiled as a
+% subfile. In the assembled session, the parent title and topic divider remain.
+% Usage: \TopicStandaloneTitle{01}{Topic title}{Session subtitle}
+\newcommand{\TopicStandaloneTitle}[3]{%
+  \ifSubfilesClassLoaded{%
+    \title{Topic #1: #2}\subtitle{#3}\gdef\UpGradDeckKind{Topic #1}%
+    \begin{frame}[plain]\titlepage\end{frame}%
+  }{}%
+}
+% \SectionDivider{number}{heading}{one-sentence teaching intent}
+\newcommand{\SectionDivider}[3]{%
+  \begin{frame}[plain]
+    \vfill
+    {\color{UpGradRed}\bfseries\large #1}\par\vspace{0.22cm}
+    {\fontsize{25}{30}\selectfont\bfseries\color{UpGradInk}#2\par}\vspace{0.28cm}
+    {\large\color{UpGradSlate}#3\par}
+    \vfill
+  \end{frame}%
+}
+
+% Teaching-pattern boxes. Keep their titles semantic: authors choose the message,
+% not a colour or a layout on every slide.
+\newtcolorbox{UpGradBaseBox}[2][]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,colframe=UpGradRule,left=3.2mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradInk,title={#2},#1}
+\newtcolorbox{LearningObjectives}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradInk,title={#1}}
+\newtcolorbox{DefinitionBox}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradBlue},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradBlue,title={Definition\enspace--\enspace#1}}
+\newtcolorbox{ConceptBox}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradRedDark,title={#1}}
+\newtcolorbox{ExampleBox}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradGreen},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradGreen,title={Example\enspace--\enspace#1}}
+\newtcolorbox{WarningBox}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradAmber},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradAmber,title={Watch for\enspace--\enspace#1}}
+\newtcolorbox{QuestionBox}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradBlue},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradBlue,title={Question\enspace--\enspace#1}}
+\newtcolorbox{ExerciseBox}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradRedDark,title={Try it\enspace--\enspace#1}}
+\newtcolorbox{CaseStudyBox}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradInk},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradInk,title={Case study\enspace--\enspace#1}}
+\newtcolorbox{TakeawayBox}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradRed!7!white,colbacktitle=UpGradRed!7!white,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradRedDark,title={Key takeaway\enspace--\enspace#1}}
+\newtcolorbox{CodeCallout}[1]{enhanced,sharp corners,boxrule=0pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
+  fonttitle=\bfseries,coltitle=UpGradRedDark,title={#1}}
+% TeXScience is the portable scientific-diagram layer. It relies only on the
+% local TeX distribution: TikZ/PGFPlots, siunitx, circuitikz, chemfig and
+% tikz-3dplot. It deliberately does not require shell escape or a web service.
+\newtcolorbox{ScientificFigure}[1]{enhanced,sharp corners,boxrule=.35pt,
+  colback=white,colframe=UpGradRule,left=3.2mm,right=3.2mm,top=2.4mm,bottom=2.4mm,
+  fonttitle=\bfseries,coltitle=UpGradInk,title={#1}}
+\newcommand{\ScienceCaption}[1]{\par\smallskip{\scriptsize\color{UpGradSlate}#1}}
+\newcommand{\ScienceUnit}[2]{\SI{#1}{#2}}
+
+\newcommand{\TwoColumnLayout}[2]{%
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.485\textwidth}#1\end{column}
+    \begin{column}{0.485\textwidth}#2\end{column}
+  \end{columns}%
+}
+% tabularx scans its complete body; environ safely captures our semantic wrapper
+% before passing it to tabularx, retaining both X columns and a clean API.
+\NewEnviron{UpGradTable}[1]{\renewcommand{\arraystretch}{1.25}\small\rowcolors{2}{UpGradMist}{white}\begin{tabularx}{\linewidth}{#1}\BODY\end{tabularx}}
+\newcommand{\TableHeaderRow}{\rowcolor{UpGradInk}}
+\newcommand{\TableHead}[1]{\color{white}\bfseries #1}
+
+% Figures are constrained by default. Authors may add trim/clip/width options.
+\newcommand{\DeckImage}[3][]{%
+  \begin{figure}\centering
+    \includegraphics[width=\linewidth,height=.59\textheight,keepaspectratio,#1]{#2}%
+    \ifstrempty{#3}{}{\caption{#3}}%
+  \end{figure}%
+}
+\newcommand{\SideBySideFigures}[5][]{%
+  \begin{figure}\centering
+    \begin{minipage}[t]{.485\linewidth}\centering\includegraphics[width=\linewidth,height=.48\textheight,keepaspectratio,#1]{#2}\\[-1mm]\scriptsize\color{UpGradSlate}#3\end{minipage}\hfill
+    \begin{minipage}[t]{.485\linewidth}\centering\includegraphics[width=\linewidth,height=.48\textheight,keepaspectratio,#1]{#4}\\[-1mm]\scriptsize\color{UpGradSlate}#5\end{minipage}
+  \end{figure}%
+}
+% Use percentages inside this environment: \ScreenshotCallout{68}{63}{Model artefact}.
+\newenvironment{AnnotatedScreenshot}[2]{%
+  \begin{figure}\centering\def\UpGradScreenshotCaption{#2}%
+  \begin{overpic}[width=\linewidth,height=.58\textheight,keepaspectratio]{#1}%
+}{%
+  \end{overpic}\ifstrempty{\UpGradScreenshotCaption}{}{\caption{\UpGradScreenshotCaption}}\end{figure}%
+}
+\newcommand{\ScreenshotCallout}[3]{\put(#1,#2){\makebox(0,0)[l]{\colorbox{UpGradRed}{\scriptsize\color{white}\strut\hspace{1.4mm}#3\hspace{1.4mm}}}}}
+
+% listings is the baseline: available in the supplied TeX toolchain, requires no
+% shell escape, and supports Python, SQL, Bash, JSON, YAML-as-text and custom keys.
+\lstdefinelanguage{JSON}{morestring=[b]",morecomment=[l]{//},morekeywords={true,false,null}}
+\lstdefinelanguage{YAML}{sensitive=false,morecomment=[l]{\#},morestring=[b]",morekeywords={true,false,yes,no,null}}
+\lstdefinestyle{UpGradCode}{%
+  backgroundcolor=\color{UpGradCode},basicstyle=\ttfamily\scriptsize\color{UpGradInk},
+  commentstyle=\color{UpGradGreen},keywordstyle=\bfseries\color{UpGradBlue},stringstyle=\color{UpGradRedDark},
+  frame=single,framerule=0pt,rulecolor=\color{UpGradRule},framesep=4pt,
+  breaklines=true,breakatwhitespace=false,columns=fullflexible,keepspaces=true,
+  showstringspaces=false,tabsize=2,numbers=left,numberstyle=\tiny\color{UpGradMuted},numbersep=6pt,
+  xleftmargin=0pt,xrightmargin=0pt,linebackgroundcolor={\UpGradLineBackground}}
+\newcommand{\UpGradHighlightedLines}{}
+\makeatletter
+\newcommand{\UpGradLineBackground}{%
+  \def\UpGradLineMatch{0}%
+  \@for\UpGradLineCandidate:=\UpGradHighlightedLines\do{%
+    \ifnum\value{lstnumber}=\UpGradLineCandidate\relax\def\UpGradLineMatch{1}\fi}%
+  \ifnum\UpGradLineMatch=1\color{UpGradCodeHighlight}\fi}
+\makeatother
+\lstnewenvironment{CodeBlock}[2][]{\lstset{style=UpGradCode,language=#2,#1}}{}
+% Usage: \begin{HighlightedCodeBlock}[numbers=left]{Python}{3,4} ... \end{HighlightedCodeBlock}
+\lstnewenvironment{HighlightedCodeBlock}[3][]{\gdef\UpGradHighlightedLines{#3}\lstset{style=UpGradCode,language=#2,#1}}{\gdef\UpGradHighlightedLines{}}
+\newcommand{\InlineCode}[1]{{\ttfamily\color{UpGradRedDark}\small #1}}
+% Keep longer, annotated snippets in a small source file. This places the code and
+% its teaching note together without manual positioning.
+% \CodeFromFileWithCallout[listing options]{language}{file}{highlighted lines}{callout title}{callout text}
+\newcommand{\CodeFromFileWithCallout}[6][]{%
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{.61\textwidth}\begingroup\gdef\UpGradHighlightedLines{#4}\lstinputlisting[style=UpGradCode,language=#2,numbers=left,#1]{#3}\endgroup\end{column}
+    \begin{column}{.35\textwidth}\begin{CodeCallout}{#5}#6\end{CodeCallout}\end{column}
+  \end{columns}%
+}
+
+% Diagram primitives work with ordinary TikZ; no external asset library required.
+\tikzset{
+  upgrad/service/.style={rounded corners=2pt,draw=UpGradRule,fill=UpGradMist,very thick,minimum width=2.15cm,minimum height=.75cm,align=center,font=\small\bfseries\color{UpGradInk}},
+  upgrad/data/.style={upgrad/service,fill=UpGradRed!7!white,draw=UpGradRed!45!white},
+  upgrad/model/.style={upgrad/service,fill=UpGradBlue!7!white,draw=UpGradBlue!45!white},
+  upgrad/flow/.style={-{Latex[length=2mm]},very thick,draw=UpGradSlate},
+  upgrad/callout/.style={rounded corners=1pt,fill=UpGradRed,text=white,font=\scriptsize\bfseries,inner xsep=2.2mm,inner ysep=1.2mm},
+  upgrad/science node/.style={rounded corners=1.5pt,draw=UpGradBlue!55!white,fill=UpGradBlue!6!white,minimum height=.62cm,align=center,font=\small\bfseries\color{UpGradInk}},
+  upgrad/measurement/.style={-{Latex[length=1.6mm]}-{Latex[length=1.6mm]},draw=UpGradRed,very thick}
+}
+\pgfplotsset{upgrad/science plot/.style={
+  axis line style={draw=UpGradSlate},tick style={draw=UpGradSlate},
+  tick label style={font=\scriptsize,color=UpGradSlate},label style={font=\scriptsize,color=UpGradSlate},
+  grid=major,grid style={draw=UpGradRule,line width=.25pt},legend style={font=\scriptsize,draw=none,fill=none},
+  every axis plot/.append style={very thick},width=.88\linewidth,height=.42\textheight
+}}
+\newcommand{\Citation}[1]{{\scriptsize\color{UpGradMuted}#1}}
+\newenvironment{References}{\begin{frame}[fragile,environment=References]{References}\footnotesize\color{UpGradSlate}\begin{itemize}}{\end{itemize}\end{frame}}

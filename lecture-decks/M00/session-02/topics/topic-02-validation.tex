@@ -1,0 +1,25 @@
+\documentclass[../m00-session-02.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{02}{Validate before analysis}{Data foundations: from S3 objects to analysable tables}
+\TopicDivider{02}{Validate before analysis}{Inspect types, missingness, time and entity keys before transformations begin.}
+
+\begin{frame}[fragile]{Inspect before you transform}
+  \begin{HighlightedCodeBlock}[numbers=left]{Python}{3,4,7}
+import pandas as pd
+
+orders = pd.read_csv("data/orders.csv")
+print(orders.dtypes)
+print(orders.isna().mean().sort_values(ascending=False).head())
+
+orders["ordered_at"] = pd.to_datetime(orders["ordered_at"], utc=True)
+assert orders["order_id"].is_unique
+  \end{HighlightedCodeBlock}
+  \Citation{The first model feature is often a validation check: are we measuring the entity and time period we think we are?}
+\end{frame}
+
+\begin{frame}{Key takeaway}
+  \begin{TakeawayBox}{Storage is not semantics}
+    S3 gives durable object storage. Naming conventions, schema checks and documented transformations make those objects safe to analyse.
+  \end{TakeawayBox}
+\end{frame}
+\end{document}

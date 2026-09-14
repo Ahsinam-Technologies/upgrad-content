@@ -1,0 +1,37 @@
+\documentclass[../m00-session-01.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{01}{Set the workspace boundary}{Foundations: Python, Cloud and a reproducible workspace}
+\TopicDivider{01}{Set the workspace boundary}{Separate the project, credentials, data and documentation from the start.}
+
+\begin{frame}{What this topic establishes}
+  \begin{LearningObjectives}{By the end of this topic, learners can}
+    \begin{itemize}
+      \item describe the role of Python, IAM, S3 and Git in a data-science workflow;
+      \item create a minimal local project structure that can be reproduced by a teammate; and
+      \item distinguish credentials, code and data artefacts by where they should live.
+    \end{itemize}
+  \end{LearningObjectives}
+\end{frame}
+
+\begin{frame}{The smallest useful data-science workspace}
+  \TwoColumnLayout{
+    \begin{ConceptBox}{Local project}
+      \begin{itemize}
+        \item versioned Python environment
+        \item \InlineCode{src/} for reusable code
+        \item \InlineCode{notebooks/} for exploration
+        \item \InlineCode{README.md} for the next learner
+      \end{itemize}
+    \end{ConceptBox}
+  }{
+    \begin{ConceptBox}{AWS account boundary}
+      \begin{itemize}
+        \item IAM role grants least-privilege access
+        \item S3 stores durable data and artefacts
+        \item CloudShell offers a browser-based terminal
+        \item never commit keys or tokens to Git
+      \end{itemize}
+    \end{ConceptBox}
+  }
+\end{frame}
+\end{document}

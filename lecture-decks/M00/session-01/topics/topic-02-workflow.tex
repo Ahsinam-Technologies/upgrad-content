@@ -1,0 +1,34 @@
+\documentclass[../m00-session-01.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{02}{Make the workflow explicit}{Foundations: Python, Cloud and a reproducible workspace}
+\TopicDivider{02}{Make the workflow explicit}{Use an environment, version control and clear responsibility boundaries.}
+
+\begin{frame}[fragile]{First checkpoint: prove the environment is explicit}
+  \begin{CodeBlock}[numbers=left]{Bash}
+python --version
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install pandas scikit-learn
+git init
+git status
+  \end{CodeBlock}
+  \begin{WarningBox}{Do not treat an activated environment as documentation}
+    Record dependencies in a requirements file or equivalent lockfile so the session can be reproduced later.
+  \end{WarningBox}
+\end{frame}
+
+\begin{frame}{A practical responsibility map}
+  \centering
+  \begin{tikzpicture}[node distance=1.25cm]
+    \node[upgrad/service] (git) {Git\\code history};
+    \node[upgrad/data,right=of git] (s3) {S3\\data + artefacts};
+    \node[upgrad/model,right=of s3] (python) {Python\\analysis};
+    \draw[upgrad/flow] (git) -- node[above,font=\scriptsize,text=UpGradSlate]{clone} (python);
+    \draw[upgrad/flow] (s3) -- node[above,font=\scriptsize,text=UpGradSlate]{read / write} (python);
+  \end{tikzpicture}
+  \vspace{.35cm}
+  \begin{TakeawayBox}{Reproducibility begins before modelling}
+    A clear project boundary makes it possible to tell which code, data and credentials created an analysis.
+  \end{TakeawayBox}
+\end{frame}
+\end{document}

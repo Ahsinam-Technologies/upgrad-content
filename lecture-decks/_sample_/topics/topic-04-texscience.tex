@@ -1,0 +1,46 @@
+\documentclass[../sample-deck.tex]{subfiles}
+\begin{document}
+\TopicStandaloneTitle{04}{TeXScience diagrams}{From data to a deployable churn signal}
+\TopicDivider{04}{TeXScience diagrams}{Use editable scientific plots and diagrams without a remote rendering dependency.}
+
+\begin{frame}{Scientific plot: expose the trade-off, not just the number}
+  \begin{ScientificFigure}{Illustrative validation curves}
+    \centering
+    \begin{tikzpicture}
+      \begin{axis}[upgrad/science plot,xlabel={model complexity},ylabel={validation loss},xmin=0,xmax=10,ymin=.15,ymax=1.05,legend pos=north east]
+        \addplot[color=UpGradBlue,domain=0:10,samples=80] {.025*(x-5)^2+.28};
+        \addlegendentry{validation loss}
+        \addplot[color=UpGradRed,domain=0:10,samples=80] {.91*exp(-.32*x)+.08};
+        \addlegendentry{training loss}
+        \addplot[only marks,mark=*,color=UpGradInk] coordinates {(5,.28)};
+      \end{axis}
+    \end{tikzpicture}
+    \ScienceCaption{The plot is PGFPlots source: change the functions, units or labels in version control rather than redrawing an image.}
+  \end{ScientificFigure}
+\end{frame}
+
+\begin{frame}{Scientific diagram: make the system inspectable}
+  \TwoColumnLayout{
+    \begin{ScientificFigure}{Measurement path}
+      \centering
+      \begin{tikzpicture}[node distance=.75cm]
+        \node[upgrad/science node] (sensor) {sensor};
+        \node[upgrad/science node,right=of sensor] (model) {model};
+        \node[upgrad/science node,right=of model] (action) {action};
+        \draw[upgrad/flow] (sensor) -- node[above,font=\scriptsize,text=UpGradSlate]{signal} (model);
+        \draw[upgrad/flow] (model) -- node[above,font=\scriptsize,text=UpGradSlate]{decision} (action);
+      \end{tikzpicture}
+      \ScienceCaption{Editable TikZ node-and-flow diagram.}
+    \end{ScientificFigure}
+  }{
+    \begin{ConceptBox}{TeXScience support}
+      \begin{itemize}
+        \item \InlineCode{pgfplots} for charts
+        \item \InlineCode{siunitx} for values such as \ScienceUnit{12.5}{\milli\second}
+        \item \InlineCode{circuitikz}, \InlineCode{chemfig} and \InlineCode{tikz-3dplot} for domain diagrams
+        \item no shell escape or web renderer required
+      \end{itemize}
+    \end{ConceptBox}
+  }
+\end{frame}
+\end{document}

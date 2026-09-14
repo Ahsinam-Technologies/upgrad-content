@@ -1,0 +1,11 @@
+# LaTeX keeps its deliverable PDF next to source. Ignore only rebuildable files.
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
