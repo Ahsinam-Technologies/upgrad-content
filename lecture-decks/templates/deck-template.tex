@@ -1,26 +1,27 @@
-% Copy this file into Mxx/session-yy/ or Mxx/pre-read/ and rename it predictably:
+% Copy this file into Mxx/session-yy/ or Mxx/pre-read/ and rename it:
 % m02-session-03.tex or m02-pre-read.tex. Compile via `make deck DECK=...`.
 \documentclass[aspectratio=169,10pt]{beamer}
 \usepackage{upgradbeamer}
-\author{UpGrad Learning Team}
+\DeckMetadata{Data Science on AWS}{M02 Session 03}
+\author{upGrad Enterprise Cloud Faculty}
 \date{}
 
 \begin{document}
-\UpGradTitleSlide{Session title}{A learner-facing subtitle}{M02}{Session 03}
+\UpGradTitleSlide{Scalable Data Processing on AWS}{Architecture, Performance Tuning \& Production Best Practices}{Data Science on AWS}{Session 03}
 
-\begin{frame}{Learning objectives}
+\begin{frame}{Learning Objectives}
   \begin{LearningObjectives}{By the end of this session, learners can}
     \begin{itemize}
-      \item State an observable outcome.
-      \item Apply it to a short technical example.
-      \item Explain one practical trade-off.
+      \item Formulate an observable technical outcome for cloud architectures.
+      \item Design scalable pipelines applying least-privilege IAM and S3 tiering.
+      \item Evaluate operational trade-offs between cost, latency, and throughput.
     \end{itemize}
   \end{LearningObjectives}
 \end{frame}
 
-\begin{frame}{Key takeaway}
-  \begin{TakeawayBox}{One sentence worth remembering}
-    Put the instructional conclusion here, then support it with examples in the body.
+\begin{frame}{Key Architectural Takeaway}
+  \begin{TakeawayBox}{Operational Invariant}
+    Decouple compute from storage: leverage managed S3 data lakes with serverless compute engines to achieve independent scaling and cost governance.
   \end{TakeawayBox}
 \end{frame}
 \end{document}

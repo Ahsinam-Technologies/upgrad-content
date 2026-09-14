@@ -1,4 +1,7 @@
-.PHONY: decks deck session topic topics clean-decks validate-decks
+.PHONY: decks deck session topic topics sample-deck clean-decks validate-decks
+
+sample-deck:
+	$(MAKE) -C lecture-decks sample-deck
 
 decks:
 	$(MAKE) -C lecture-decks all

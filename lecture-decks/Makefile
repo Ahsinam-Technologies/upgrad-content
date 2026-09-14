@@ -2,28 +2,32 @@
 # beside their matching source. Editing one topic never requires compiling the
 # complete session until you explicitly ask for its assembled PDF.
 LATEXMK ?= latexmk
-LATEXMK_FLAGS := -pdf -interaction=nonstopmode -halt-on-error -file-line-error
+LATEXMK_FLAGS := -xelatex -interaction=nonstopmode -halt-on-error -file-line-error
 THEME_DIR := $(abspath theme)
 DECKS := $(shell find . -type f -name '*.tex' ! -path './theme/*' ! -path './templates/*' ! -path '*/topics/*' | sort)
 TOPIC_SOURCES := $(shell find . -type f -path '*/topics/*.tex' | sort)
 ALL_SOURCES := $(DECKS) $(TOPIC_SOURCES)
 
-.PHONY: all deck session topic topics topic-all clean validate list list-topics help
+.PHONY: all deck session topic topics topic-all clean validate list list-topics sample-deck help
 
 help:
-	@echo "make all                                      Compile assembled sessions, pre-reads and sample"
+	@echo "make all                                         Compile assembled sessions, pre-reads and sample"
+	@echo "make sample-deck                                 Compile reference Data Science on AWS masterclass deck"
 	@echo "make deck DECK=M00/session-01/m00-session-01.tex Compile one assembled deck"
 	@echo "make session SESSION=M00/session-01              Compile one assembled session"
 	@echo "make topic TOPIC=M00/session-01/topics/topic-01-workspace.tex"
 	@echo "make topics SESSION=M00/session-01               Compile every topic in one session"
-	@echo "make validate                                  Compile all sources and check every PDF"
-	@echo "make clean                                     Remove auxiliary LaTeX files"
+	@echo "make validate                                    Compile all sources and check every PDF"
+	@echo "make clean                                       Remove auxiliary LaTeX files"
 
 list:
 	@printf '%s\n' $(DECKS)
 
 list-topics:
 	@printf '%s\n' $(TOPIC_SOURCES)
+
+sample-deck:
+	@$(MAKE) --no-print-directory deck DECK=_sample_/sample-deck.tex
 
 all:
 	@failed=0; \
@@ -37,7 +41,7 @@ deck:
 	@test -f "$(DECK)" || (echo "Deck not found: $(DECK)"; exit 2)
 	@dir=$$(dirname "$(DECK)"); file=$$(basename "$(DECK)"); \
 	  echo "==> $(DECK)"; \
-	  cd "$$dir" && TEXINPUTS="$(THEME_DIR):" $(LATEXMK) $(LATEXMK_FLAGS) "$$file" && $(LATEXMK) -c "$$file" && find . -maxdepth 1 -type f \( -name '*.nav' -o -name '*.snm' -o -name '*.vrb' \) -delete
+	  cd "$$dir" && TEXINPUTS="$(THEME_DIR):" $(LATEXMK) $(LATEXMK_FLAGS) "$$file" && $(LATEXMK) -c "$$file" && find . -maxdepth 1 -type f \( -name '*.nav' -o -name '*.snm' -o -name '*.vrb' -o -name '*.xdv' \) -delete
 
 session:
 	@test -n "$(SESSION)" || (echo "Set SESSION, e.g. make session SESSION=M00/session-01"; exit 2)
@@ -75,4 +79,4 @@ validate: all topic-all
 	exit $$failed
 
 clean:
-	@find . -type f \( -name '*.aux' -o -name '*.fdb_latexmk' -o -name '*.fls' -o -name '*.log' -o -name '*.nav' -o -name '*.out' -o -name '*.snm' -o -name '*.synctex.gz' -o -name '*.toc' -o -name '*.vrb' \) -delete
+	@find . -type f \( -name '*.aux' -o -name '*.fdb_latexmk' -o -name '*.fls' -o -name '*.log' -o -name '*.nav' -o -name '*.out' -o -name '*.snm' -o -name '*.synctex.gz' -o -name '*.toc' -o -name '*.vrb' -o -name '*.xdv' \) -delete

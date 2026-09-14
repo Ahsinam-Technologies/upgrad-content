@@ -1,14 +1,13 @@
-% upgradbeamer.sty — shared, content-first Beamer presentation layer.
-% Keep visual decisions here; individual decks should contain teaching content.
+% upgradbeamer.sty — upGrad Enterprise Presentation Layer for Data Science on AWS.
+% Brand Identity: Montserrat Display + Plus Jakarta Sans Body, UpGrad Crimson + AWS Cloud Palette.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{upgradbeamer}[2026/09/14 UpGrad lecture-deck framework]
+\ProvidesPackage{upgradbeamer}[2026/09/14 upGrad Enterprise Data Science on AWS slide framework]
+
 \newif\ifUpGradScience
 \DeclareOption{science}{\UpGradSciencetrue}
 \ProcessOptions\relax
 
-\RequirePackage[utf8]{inputenc}
-\RequirePackage[T1]{fontenc}
-\RequirePackage{lmodern}
+\RequirePackage{iftex}
 \RequirePackage{microtype}
 \RequirePackage{xcolor}
 \RequirePackage{graphicx}
@@ -18,12 +17,14 @@
 \RequirePackage{tabularx}
 \RequirePackage{tikz}
 \RequirePackage{pgfplots}
+
 \ifUpGradScience
   \RequirePackage{siunitx}
   \RequirePackage{tikz-3dplot}
   \RequirePackage{circuitikz}
   \RequirePackage{chemfig}
 \fi
+
 \RequirePackage{tcolorbox}
 \RequirePackage{environ}
 \RequirePackage{listings}
@@ -31,14 +32,407 @@
 \RequirePackage{overpic}
 \RequirePackage{hyperref}
 
-\usetikzlibrary{arrows.meta,backgrounds,calc,decorations.pathreplacing,positioning,shapes.geometric}
+\usetikzlibrary{arrows.meta,backgrounds,calc,decorations.pathreplacing,positioning,shapes.geometric,shadows}
 \pgfplotsset{compat=1.18}
 \ifUpGradScience\sisetup{detect-all,output-decimal-marker={.}}\fi
-\tcbuselibrary{skins}
+\tcbuselibrary{skins,raster}
 
-% A small compatibility-safe adaptation of lstlinebgrd. The TeX Live add-on
-% shipped here still uses an obsolete listings key syntax; defining the four
-% keys locally gives the same full-line highlighting without a fragile version pin.
+% -----------------------------------------------------------------------------
+% Typography & Font Resolution (Montserrat Display + Plus Jakarta Sans Body)
+% -----------------------------------------------------------------------------
+\ifXeTeX
+  \RequirePackage{fontspec}
+  \newcommand{\UpGradFontPath}{}
+  \IfFileExists{../../../theme/fonts/Montserrat-Regular.ttf}{\gdef\UpGradFontPath{../../../theme/fonts/}}{%
+  \IfFileExists{../../theme/fonts/Montserrat-Regular.ttf}{\gdef\UpGradFontPath{../../theme/fonts/}}{%
+  \IfFileExists{../theme/fonts/Montserrat-Regular.ttf}{\gdef\UpGradFontPath{../theme/fonts/}}{%
+  \IfFileExists{theme/fonts/Montserrat-Regular.ttf}{\gdef\UpGradFontPath{theme/fonts/}}{%
+  \IfFileExists{fonts/Montserrat-Regular.ttf}{\gdef\UpGradFontPath{fonts/}}{%
+  \IfFileExists{../../../../theme/fonts/Montserrat-Regular.ttf}{\gdef\UpGradFontPath{../../../../theme/fonts/}}{%
+  }}}}}}
+  
+  \ifx\UpGradFontPath\empty
+    \IfFontExistsTF{Plus Jakarta Sans}{%
+      \setsansfont[BoldFont=Plus Jakarta Sans Bold,ItalicFont=Plus Jakarta Sans Italic]{Plus Jakarta Sans}
+      \newfontfamily\UpGradDisplayFont[BoldFont=Montserrat Bold,ItalicFont=Montserrat Italic]{Montserrat}
+    }{%
+      \setsansfont{DejaVu Sans}
+      \newfontfamily\UpGradDisplayFont{DejaVu Sans}
+    }
+  \else
+    \setsansfont[
+      Path=\UpGradFontPath,
+      UprightFont=PlusJakartaSans-Regular.ttf,
+      BoldFont=PlusJakartaSans-Bold.ttf,
+      ItalicFont=PlusJakartaSans-Italic.ttf
+    ]{PlusJakartaSans}
+    \newfontfamily\UpGradDisplayFont[
+      Path=\UpGradFontPath,
+      UprightFont=Montserrat-Regular.ttf,
+      BoldFont=Montserrat-Bold.ttf,
+      ItalicFont=Montserrat-Italic.ttf
+    ]{Montserrat}
+  \fi
+  \setmonofont{DejaVu Sans Mono}[Scale=0.86]
+\else
+  \RequirePackage[utf8]{inputenc}
+  \RequirePackage[T1]{fontenc}
+  \RequirePackage{lmodern}
+  \newcommand{\UpGradDisplayFont}{\sffamily\bfseries}
+\fi
+
+% -----------------------------------------------------------------------------
+% upGrad Executive & AWS Cloud Brand Palette
+% -----------------------------------------------------------------------------
+\definecolor{UpGradRed}{HTML}{EE2F3D}           % Primary Brand Crimson
+\definecolor{UpGradRedDark}{HTML}{C71F31}       % Deep Ruby
+\definecolor{UpGradRedGlow}{HTML}{FF4D5A}       % Vibrant Coral Accent
+\definecolor{UpGradNight}{HTML}{0F172A}         % Deep Night Navy
+\definecolor{UpGradInk}{HTML}{1E293B}           % High-contrast Charcoal Body
+\definecolor{UpGradSlate}{HTML}{64748B}         % Muted Slate
+\definecolor{UpGradMuted}{HTML}{94A3B8}         % Secondary Subtext
+\definecolor{UpGradRule}{HTML}{E2E8F0}          % Subtle Modern Rule
+\definecolor{UpGradMist}{HTML}{F8FAFC}          % Surface Canvas Light
+\definecolor{UpGradCanvas}{HTML}{FFFFFF}        % Pure White Canvas
+\definecolor{UpGradCode}{HTML}{F1F5F9}          % Codeblock Background
+\definecolor{UpGradCodeHighlight}{HTML}{FFE4E6} % Code Line Highlight
+
+% AWS Cloud Domain Accents
+\definecolor{AWSOrange}{HTML}{FF9900}           % AWS Signature Orange
+\definecolor{AWSSquid}{HTML}{232F3E}            % AWS Navy / Squid Ink
+\definecolor{AWSBlue}{HTML}{0284C7}             % AWS Cloud Cyan / Sky
+\definecolor{AWSEmerald}{HTML}{059669}          % AWS Operational Green
+\definecolor{AWSPurple}{HTML}{7C3AED}           % AWS AI / Bedrock Violet
+\definecolor{AWSAmber}{HTML}{D97706}            % AWS Caution Amber
+\colorlet{UpGradBlue}{AWSBlue}
+
+\hypersetup{colorlinks=true,urlcolor=AWSBlue,linkcolor=UpGradRed,citecolor=AWSEmerald}
+\renewcommand{\familydefault}{\sfdefault}
+\setlength{\parskip}{0.30em}
+\setlength{\parindent}{0pt}
+\setbeamersize{text margin left=0.72cm,text margin right=0.72cm}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize item}{\raise0.15ex\hbox{\tiny\textcolor{UpGradRed}{\textbullet}}}
+\setbeamertemplate{itemize subitem}{\raise0.15ex\hbox{\scriptsize\textcolor{AWSOrange}{\textbullet}}}
+\setbeamertemplate{enumerate item}{\color{UpGradRed}\bfseries\insertenumlabel.}
+\setbeamertemplate{caption}[numbered]
+\setbeamertemplate{blocks}[rounded]
+\setbeamercolor{normal text}{fg=UpGradInk,bg=UpGradCanvas}
+\setbeamercolor{frametitle}{fg=UpGradNight,bg=UpGradCanvas}
+\setbeamerfont{frametitle}{series=\bfseries,size=\Large}
+\setbeamerfont{normal text}{size=\normalsize}
+\setbeamerfont{caption}{size=\scriptsize}
+\setbeamercolor{caption name}{fg=UpGradSlate}
+
+% -----------------------------------------------------------------------------
+% Metadata & Wordmark
+% -----------------------------------------------------------------------------
+\newcommand{\UpGradModule}{}
+\newcommand{\UpGradDeckKind}{}
+\newcommand{\DeckMetadata}[2]{\gdef\UpGradModule{#1}\gdef\UpGradDeckKind{#2}}
+\newcommand{\UpGradWordmark}{%
+  {\UpGradDisplayFont\fontsize{11}{13}\selectfont\bfseries\color{UpGradNight}up\textcolor{UpGradRed}{Grad}}%
+}
+
+% -----------------------------------------------------------------------------
+% Frametitle & Footline (Streamlined & Collision-Free)
+% -----------------------------------------------------------------------------
+\setbeamertemplate{frametitle}{%
+  \vspace{0.18cm}%
+  {\UpGradDisplayFont\fontsize{15}{18}\selectfont\bfseries\color{UpGradNight}\insertframetitle}\par
+  \vspace{0.08cm}%
+  \textcolor{UpGradRed}{\rule{1.40cm}{2.0pt}}\textcolor{AWSOrange}{\rule{0.60cm}{2.0pt}}\textcolor{UpGradRule}{\rule{\dimexpr\textwidth-2.00cm\relax}{0.4pt}}\vspace{-0.02cm}
+}
+
+\setbeamertemplate{footline}{%
+  \leavevmode\hbox{%
+    \begin{beamercolorbox}[wd=.68\paperwidth,ht=0.36cm,dp=0.12cm,leftskip=.72cm]{author in head/foot}%
+      \scriptsize\bfseries\color{UpGradSlate}\UpGradModule\ifstrempty{\UpGradDeckKind}{}{\enspace{\color{UpGradRed}\textbar}\enspace\color{UpGradInk}\UpGradDeckKind}%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.32\paperwidth,ht=0.36cm,dp=0.12cm,rightskip=.72cm plus 1fill]{date in head/foot}%
+      \hfill%
+      \tcbox[on line,boxsep=0pt,left=4pt,right=4pt,top=1.2pt,bottom=1.2pt,colback=UpGradMist,colframe=UpGradRule,arc=1.0mm,boxrule=0.4pt]{%
+        \tiny\bfseries\color{UpGradSlate}\insertframenumber\enspace/\enspace\inserttotalframenumber%
+      }%
+      \hspace{0.35cm}%
+      \UpGradWordmark
+    \end{beamercolorbox}%
+  }\vskip0.12cm%
+}
+
+% -----------------------------------------------------------------------------
+% Title Page
+% -----------------------------------------------------------------------------
+\setbeamercolor{title page}{bg=UpGradNight}
+\setbeamertemplate{title page}{%
+  \begin{beamercolorbox}[wd=\paperwidth,ht=\paperheight,sep=0pt]{title page}%
+    \begin{tikzpicture}[remember picture,overlay]
+      \fill[UpGradRed] (current page.north west) rectangle ([xshift=.22cm]current page.south west);
+      \fill[AWSOrange] ([xshift=.22cm]current page.north west) rectangle ([xshift=.28cm,yshift=-2.2cm]current page.north west);
+      \draw[UpGradSlate!25!UpGradNight,line width=.4pt] ([xshift=14.5cm,yshift=-.72cm]current page.north west) -- ([xshift=14.5cm,yshift=-7.02cm]current page.north west);
+      \fill[UpGradRed] ([xshift=14.5cm,yshift=-6.95cm]current page.north west) rectangle ([xshift=15.65cm,yshift=-7.02cm]current page.north west);
+    \end{tikzpicture}%
+    \vspace*{0.66cm}\hspace*{0.72cm}{\UpGradDisplayFont\fontsize{14}{16}\selectfont\bfseries\color{white}up\textcolor{UpGradRed}{Grad}\enspace\textcolor{UpGradSlate}{\textbar}\enspace\color{AWSOrange}Enterprise Data Science on AWS}
+    \vfill
+    \hspace*{0.72cm}{\color{UpGradRed}\rule{1.40cm}{2.4pt}}\textcolor{AWSOrange}{\rule{0.60cm}{2.4pt}}\par\vspace{0.32cm}
+    \hspace*{0.72cm}\begin{minipage}{0.75\paperwidth}\raggedright
+      {\UpGradDisplayFont\fontsize{24}{29}\selectfont\bfseries\color{white}\inserttitle\par}
+      \vspace{0.28cm}{\large\color{UpGradMist}\insertsubtitle\par}
+    \end{minipage}
+    \vfill
+    \hspace*{0.72cm}{\scriptsize\bfseries\color{UpGradMuted}\UpGradModule\ifstrempty{\UpGradDeckKind}{}{\enspace{\color{UpGradRed}\textbar}\enspace\UpGradDeckKind}}\vspace*{0.54cm}
+  \end{beamercolorbox}%
+}
+
+% \UpGradTitleSlide{title}{subtitle}{module}{deck kind}
+\newcommand{\UpGradTitleSlide}[4]{%
+  \title{#1}\subtitle{#2}\DeckMetadata{#3}{#4}%
+  \begin{frame}[plain]\titlepage\end{frame}%
+}
+
+% -----------------------------------------------------------------------------
+% Section / Agenda / Topic Dividers
+% -----------------------------------------------------------------------------
+\newcommand{\AgendaSlide}[1]{%
+  \begin{frame}{Session Agenda}\small #1\end{frame}%
+}
+
+\newcommand{\TopicEntry}[3]{\item[] \textcolor{UpGradRed}{\bfseries #1}\hspace{.35em}\textbf{#2}\par\scriptsize\color{UpGradSlate}#3\normalsize\vspace{.15cm}}
+
+\newcommand{\SessionTopicsSlide}[1]{%
+  \begin{frame}{Session Roadmap}
+    \vspace{.02cm}\small\begin{enumerate}\setlength{\itemsep}{.08cm}#1\end{enumerate}
+    \vfill\Citation{Data Science on AWS — Modular Session Architecture}
+  \end{frame}%
+}
+
+\newcommand{\TopicDivider}[3]{%
+  {\setbeamercolor{background canvas}{bg=UpGradNight}%
+  \begin{frame}[plain]
+    \vspace*{.72cm}\hspace*{.72cm}{\UpGradDisplayFont\color{UpGradRed}\bfseries\large TOPIC\enspace#1}\par
+    \vfill\hspace*{.72cm}\begin{minipage}{.80\paperwidth}
+      {\UpGradDisplayFont\fontsize{28}{33}\selectfont\bfseries\color{white}#2\par}\vspace{.26cm}
+      {\large\color{UpGradMist}#3\par}
+    \end{minipage}\vfill
+    \hspace*{.72cm}{\scriptsize\bfseries\color{UpGradMuted}\UpGradModule\enspace{\color{UpGradRed}\textbar}\enspace\UpGradDeckKind}\vspace*{.58cm}
+  \end{frame}}%
+}
+
+\newcommand{\TopicStandaloneTitle}[3]{%
+  \ifSubfilesClassLoaded{%
+    \title{Topic #1: #2}\subtitle{#3}\gdef\UpGradDeckKind{Topic #1}%
+    \begin{frame}[plain]\titlepage\end{frame}%
+  }{}%
+}
+
+\newcommand{\SectionDivider}[3]{%
+  \begin{frame}[plain]
+    \vfill
+    {\UpGradDisplayFont\color{UpGradRed}\bfseries\large SECTION\enspace#1}\par\vspace{0.20cm}
+    {\UpGradDisplayFont\fontsize{24}{29}\selectfont\bfseries\color{UpGradNight}#2\par}\vspace{0.24cm}
+    {\large\color{UpGradSlate}#3\par}
+    \vfill
+  \end{frame}%
+}
+
+% -----------------------------------------------------------------------------
+% Specialized UI & Pedagogical Components for Data Science on AWS
+% -----------------------------------------------------------------------------
+
+% 1. Inline Pill Badge
+\newcommand{\PillBadge}[2][UpGradRed]{%
+  \tcbox[on line,boxsep=0pt,left=4pt,right=4pt,top=1.8pt,bottom=1.8pt,
+    colback=#1!12!white,colframe=#1!70!white,arc=1.0mm,boxrule=.4pt]{%
+    \tiny\bfseries\color{#1}#2%
+  }%
+}
+
+% 2. Executive Stat / Performance Card
+% Usage: \StatCard{AWSOrange}{3,500}{PUT req/sec}{S3 Standard partition rate}
+\newcommand{\StatCard}[4]{%
+  \begin{tcolorbox}[enhanced,arc=1.4mm,boxrule=.45pt,colback=UpGradMist,colframe=UpGradRule,
+    borderline north={2.2pt}{0pt}{#1},left=2.6mm,right=2.6mm,top=2.0mm,bottom=2.0mm]
+    {\UpGradDisplayFont\fontsize{18}{20}\selectfont\bfseries\color{#1}#2}\par\vspace{0.04cm}
+    {\scriptsize\bfseries\color{UpGradNight}#3}\par\vspace{0.02cm}
+    {\tiny\color{UpGradSlate}#4}
+  \end{tcolorbox}%
+}
+
+% 3. AWS Service Architecture Container Card
+% Usage: \AWSServiceCard{Amazon S3}{STORAGE}{Distributed object store with 99.999999999% durability.}{Core Lake}
+\newcommand{\AWSServiceCard}[4]{%
+  \begin{tcolorbox}[enhanced,arc=1.4mm,boxrule=.45pt,colback=UpGradMist,colframe=UpGradRule,
+    borderline west={2.5pt}{0pt}{AWSOrange},left=3.2mm,right=3.2mm,top=2.0mm,bottom=2.0mm,
+    title={{\UpGradDisplayFont\bfseries\color{AWSSquid}#1}\hfill\PillBadge[AWSOrange]{#2}},coltitle=AWSSquid]
+    \vspace{0.04cm}
+    {\scriptsize\color{UpGradInk}#3}\par\vspace{0.06cm}
+    {\tiny\bfseries\color{UpGradSlate}Tier:\enspace\color{AWSBlue}#4}
+  \end{tcolorbox}%
+}
+
+% 4. Comparative Architecture / Trade-off Grid
+% Usage: \CompareGrid{Amazon Athena}{Serverless interactive SQL...}{Amazon Redshift}{Columnar data warehouse...}
+\newcommand{\CompareGrid}[4]{%
+  \begin{tcolorbox}[enhanced,arc=1.4mm,boxrule=.45pt,colback=UpGradMist,colframe=UpGradRule,
+    left=3.0mm,right=3.0mm,top=2.2mm,bottom=2.2mm]
+    \begin{columns}[T,onlytextwidth]%
+      \begin{column}{.48\textwidth}%
+        {\UpGradDisplayFont\small\bfseries\color{AWSBlue}#1}\par\vspace{0.08cm}
+        {\scriptsize\color{UpGradInk}#2}%
+      \end{column}%
+      \hfill{\color{UpGradRule}\vrule width .4pt}\hfill%
+      \begin{column}{.48\textwidth}%
+        {\UpGradDisplayFont\small\bfseries\color{UpGradRed}#3}\par\vspace{0.08cm}
+        {\scriptsize\color{UpGradInk}#4}%
+      \end{column}%
+    \end{columns}%
+  \end{tcolorbox}%
+}
+
+% 5. Technical Pipeline & Architecture Diagram Box
+% Usage: \ArchitectureCard{Glue ETL to Redshift Pipeline}{<TikZ>}{Zero-copy Spectrum integration}
+\newcommand{\ArchitectureCard}[3]{%
+  \begin{tcolorbox}[enhanced,arc=1.4mm,boxrule=.45pt,colback=UpGradCanvas,colframe=UpGradRule,
+    borderline west={2.5pt}{0pt}{UpGradRed},left=3.2mm,right=3.2mm,top=2.0mm,bottom=2.0mm,
+    title={{\UpGradDisplayFont\bfseries\color{UpGradNight}#1}\hfill\PillBadge[UpGradRed]{PIPELINE}},coltitle=UpGradNight]
+    \centering\vspace{.05cm}
+    #2\par\vspace{.08cm}
+    \flushleft{\scriptsize\color{UpGradSlate}#3}
+  \end{tcolorbox}%
+}
+
+% 6. Mathematical Derivation & Algorithm Step Container
+% Usage: \MathDerivationStep{1}{\mathcal{L}_{\text{XGB}} = \sum_i l(y_i, \hat{y}^{(t-1)}_i + f_t(x_i)) + \Omega(f_t)}{Second-order Taylor expansion}
+\newcommand{\MathDerivationStep}[3]{%
+  \begin{tcolorbox}[enhanced,arc=1.4mm,boxrule=.45pt,colback=UpGradMist,colframe=UpGradRule,
+    left=3.2mm,right=3.2mm,top=1.8mm,bottom=1.8mm]
+    \begin{columns}[c,onlytextwidth]%
+      \begin{column}{.12\textwidth}%
+        \tcbox[on line,boxsep=0pt,left=3.5pt,right=3.5pt,top=1.5pt,bottom=1.5pt,colback=UpGradRed,colframe=UpGradRed,arc=1.0mm]{%
+          \scriptsize\bfseries\color{white}STEP #1%
+        }%
+      \end{column}%
+      \begin{column}{.54\textwidth}%
+        \centering\small\(\displaystyle #2\)%
+      \end{column}%
+      \begin{column}{.32\textwidth}%
+        {\scriptsize\color{UpGradSlate}#3}%
+      \end{column}%
+    \end{columns}%
+  \end{tcolorbox}%
+}
+
+% 7. High-Impact Operational Takeaway Banner
+% Usage: \TakeawayBanner{Always partition S3 prefixes by YYYY/MM/DD to avoid hot-partition request throttling.}
+\newcommand{\TakeawayBanner}[1]{%
+  \begin{tcolorbox}[enhanced,arc=1.4mm,boxrule=.45pt,colback=UpGradNight,colframe=AWSSquid,
+    left=3.2mm,right=3.2mm,top=2.0mm,bottom=2.0mm]
+    \begin{columns}[c,onlytextwidth]%
+      \begin{column}{.18\textwidth}%
+        \tcbox[on line,boxsep=0pt,left=4pt,right=4pt,top=1.5pt,bottom=1.5pt,colback=UpGradRed,colframe=UpGradRedGlow,arc=1.0mm]{%
+          \scriptsize\bfseries\color{white}PUNCHLINE%
+        }%
+      \end{column}%
+      \begin{column}{.80\textwidth}%
+        \small\bfseries\color{UpGradMist}#1%
+      \end{column}%
+    \end{columns}%
+  \end{tcolorbox}%
+}
+
+% -----------------------------------------------------------------------------
+% Semantic Content Boxes (Modern Refined Styling)
+% -----------------------------------------------------------------------------
+\newtcolorbox{UpGradBaseBox}[2][]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,colframe=UpGradRule,left=3.2mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=UpGradNight,title={#2},#1}
+
+\newtcolorbox{LearningObjectives}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.5pt}{0pt}{UpGradRed},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=UpGradNight,title={#1}}
+
+\newtcolorbox{DefinitionBox}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.5pt}{0pt}{AWSBlue},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=AWSBlue,title={Definition\enspace--\enspace#1}}
+
+\newtcolorbox{ConceptBox}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.5pt}{0pt}{UpGradRed},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=UpGradRedDark,title={#1}}
+
+\newtcolorbox{ExampleBox}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.5pt}{0pt}{AWSEmerald},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=AWSEmerald,title={Example\enspace--\enspace#1}}
+
+\newtcolorbox{WarningBox}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.5pt}{0pt}{AWSOrange},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=AWSAmber,title={Caution\enspace--\enspace#1}}
+
+\newtcolorbox{QuestionBox}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.5pt}{0pt}{AWSBlue},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=AWSBlue,title={Question\enspace--\enspace#1}}
+
+\newtcolorbox{ExerciseBox}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.5pt}{0pt}{UpGradRed},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=UpGradRedDark,title={Hands-on Lab\enspace--\enspace#1}}
+
+\newtcolorbox{CaseStudyBox}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.5pt}{0pt}{AWSSquid},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=AWSSquid,title={Production Case Study\enspace--\enspace#1}}
+
+\newtcolorbox{TakeawayBox}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradRed!7!white,colbacktitle=UpGradRed!7!white,borderline west={2.5pt}{0pt}{UpGradRed},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=UpGradRedDark,title={Key Takeaway\enspace--\enspace#1}}
+
+\newtcolorbox{CodeCallout}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.5pt}{0pt}{UpGradRed},left=3.6mm,right=3.2mm,top=2.2mm,bottom=2.2mm,
+  fonttitle=\bfseries,coltitle=UpGradRedDark,title={#1}}
+
+\newtcolorbox{ScientificFigure}[1]{enhanced,arc=1.2mm,boxrule=.4pt,
+  colback=white,colframe=UpGradRule,left=3.2mm,right=3.2mm,top=2.4mm,bottom=2.4mm,
+  fonttitle=\bfseries,coltitle=UpGradNight,title={#1}}
+
+\newcommand{\ScienceCaption}[1]{\par\smallskip{\scriptsize\color{UpGradSlate}#1}}
+\newcommand{\ScienceUnit}[2]{\SI{#1}{#2}}
+
+\newcommand{\TwoColumnLayout}[2]{%
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.485\textwidth}#1\end{column}
+    \begin{column}{0.485\textwidth}#2\end{column}
+  \end{columns}%
+}
+
+\NewEnviron{UpGradTable}[1]{\renewcommand{\arraystretch}{1.22}\small\rowcolors{2}{UpGradMist}{white}\begin{tabularx}{\linewidth}{#1}\BODY\end{tabularx}}
+\newcommand{\TableHeaderRow}{\rowcolor{AWSSquid}}
+\newcommand{\TableHead}[1]{\color{white}\bfseries #1}
+
+% -----------------------------------------------------------------------------
+% Visual Assets
+% -----------------------------------------------------------------------------
+\newcommand{\DeckImage}[3][]{%
+  \begin{figure}\centering
+    \includegraphics[width=\linewidth,height=.58\textheight,keepaspectratio,#1]{#2}%
+    \ifstrempty{#3}{}{\caption{#3}}%
+  \end{figure}%
+}
+
+\newcommand{\SideBySideFigures}[5][]{%
+  \begin{figure}\centering
+    \begin{minipage}[t]{.485\linewidth}\centering\includegraphics[width=\linewidth,height=.47\textheight,keepaspectratio,#1]{#2}\\[-1mm]\scriptsize\color{UpGradSlate}#3\end{minipage}\hfill
+    \begin{minipage}[t]{.485\linewidth}\centering\includegraphics[width=\linewidth,height=.47\textheight,keepaspectratio,#1]{#4}\\[-1mm]\scriptsize\color{UpGradSlate}#5\end{minipage}
+  \end{figure}%
+}
+
+\newenvironment{AnnotatedScreenshot}[2]{%
+  \begin{figure}\centering\def\UpGradScreenshotCaption{#2}%
+  \begin{overpic}[width=\linewidth,height=.56\textheight,keepaspectratio]{#1}%
+}{%
+  \end{overpic}\ifstrempty{\UpGradScreenshotCaption}{}{\caption{\UpGradScreenshotCaption}}\end{figure}%
+}
+\newcommand{\ScreenshotCallout}[3]{\put(#1,#2){\makebox(0,0)[l]{\colorbox{UpGradRed}{\scriptsize\color{white}\strut\hspace{1.4mm}#3\hspace{1.4mm}}}}}
+
+% -----------------------------------------------------------------------------
+% Code & Syntax Highlighting
+% -----------------------------------------------------------------------------
 \makeatletter
 \lst@Key{numbers}{none}{%
   \def\lst@PlaceNumber{\lst@linebgrd}%
@@ -61,236 +455,11 @@
   \fi}
 \makeatother
 
-% Brand / accessibility palette. The red is sampled from the current official
-% upGrad wordmark; neutral colours deliberately keep long technical decks calm.
-\definecolor{UpGradRed}{HTML}{EE2F3D}
-\definecolor{UpGradRedDark}{HTML}{C71F31}
-\definecolor{UpGradInk}{HTML}{1E2530}
-\definecolor{UpGradDeep}{HTML}{131A24}
-\definecolor{UpGradSlate}{HTML}{596575}
-\definecolor{UpGradMuted}{HTML}{788492}
-\definecolor{UpGradRule}{HTML}{DCE1E7}
-\definecolor{UpGradMist}{HTML}{F5F7F9}
-\definecolor{UpGradCanvas}{HTML}{FCFCFB}
-\definecolor{UpGradCode}{HTML}{F4F6F8}
-\definecolor{UpGradCodeHighlight}{HTML}{FDE8EA}
-\definecolor{UpGradGreen}{HTML}{167D63}
-\definecolor{UpGradAmber}{HTML}{A76100}
-\definecolor{UpGradBlue}{HTML}{195C9B}
-
-\hypersetup{colorlinks=true,urlcolor=UpGradBlue,linkcolor=UpGradRed,citecolor=UpGradBlue}
-\renewcommand{\familydefault}{\sfdefault}
-\setlength{\parskip}{0.35em}
-\setlength{\parindent}{0pt}
-\setbeamersize{text margin left=0.72cm,text margin right=0.72cm}
-\setbeamertemplate{navigation symbols}{}
-\setbeamertemplate{itemize item}{\raise0.15ex\hbox{\tiny\textcolor{UpGradRed}{\textbullet}}}
-\setbeamertemplate{itemize subitem}{\raise0.15ex\hbox{\scriptsize\textcolor{UpGradSlate}{\textbullet}}}
-\setbeamertemplate{enumerate item}{\color{UpGradRed}\insertenumlabel.}
-\setbeamertemplate{caption}[numbered]
-\setbeamertemplate{blocks}[rounded]
-\setbeamercolor{normal text}{fg=UpGradInk,bg=UpGradCanvas}
-\setbeamercolor{frametitle}{fg=UpGradInk,bg=UpGradCanvas}
-\setbeamerfont{frametitle}{series=\bfseries,size=\Large}
-\setbeamerfont{normal text}{size=\normalsize}
-\setbeamerfont{caption}{size=\scriptsize}
-\setbeamercolor{caption name}{fg=UpGradSlate}
-
-% Deck metadata is set once in a preamble and used by title and footer.
-\newcommand{\UpGradModule}{}
-\newcommand{\UpGradDeckKind}{}
-\newcommand{\DeckMetadata}[2]{\gdef\UpGradModule{#1}\gdef\UpGradDeckKind{#2}}
-\newcommand{\UpGradWordmark}{{\fontsize{13}{13}\selectfont\bfseries\textcolor{UpGradRed}{upGrad}}}
-
-\setbeamertemplate{frametitle}{%
-  \vspace{0.17cm}\makebox[\textwidth][r]{\scriptsize\color{UpGradMuted}\UpGradModule\ifstrempty{\UpGradDeckKind}{}{\enspace/\enspace\UpGradDeckKind}}\par
-  \vspace{0.03cm}\strut\insertframetitle\par
-  \vspace{0.10cm}\textcolor{UpGradRed}{\rule{1.05cm}{1.4pt}}\textcolor{UpGradRule}{\rule{\dimexpr\textwidth-1.05cm\relax}{0.35pt}}\vspace{-0.04cm}
-}
-\setbeamertemplate{footline}{%
-  \leavevmode\hbox{%
-    \begin{beamercolorbox}[wd=.76\paperwidth,ht=0.34cm,dp=0.13cm,leftskip=.72cm]{author in head/foot}%
-      \scriptsize\color{UpGradSlate}\UpGradModule\ifstrempty{\UpGradDeckKind}{}{\enspace|\enspace\UpGradDeckKind}%
-    \end{beamercolorbox}%
-    \begin{beamercolorbox}[wd=.24\paperwidth,ht=0.34cm,dp=0.13cm,rightskip=.72cm plus1fill]{date in head/foot}%
-      \scriptsize\color{UpGradSlate}\insertframenumber\,/\,\inserttotalframenumber\hfill\UpGradWordmark
-    \end{beamercolorbox}%
-  }\vskip0.14cm%
-}
-
-\setbeamercolor{title page}{bg=UpGradDeep}
-\setbeamertemplate{title page}{%
-  \begin{beamercolorbox}[wd=\paperwidth,ht=\paperheight,sep=0pt]{title page}%
-    \begin{tikzpicture}[remember picture,overlay]
-      \fill[UpGradRed] (current page.north west) rectangle ([xshift=.17cm]current page.south west);
-      \draw[UpGradSlate!35!UpGradDeep,line width=.35pt] ([xshift=14.85cm,yshift=-.72cm]current page.north west) -- ([xshift=14.85cm,yshift=-7.02cm]current page.north west);
-      \fill[UpGradRed] ([xshift=14.85cm,yshift=-6.98cm]current page.north west) rectangle ([xshift=15.75cm,yshift=-7.02cm]current page.north west);
-    \end{tikzpicture}%
-    \vspace*{0.66cm}\hspace*{0.72cm}\UpGradWordmark
-    \vfill
-    \hspace*{0.72cm}{\color{UpGradRed}\rule{1.35cm}{2.2pt}}\par\vspace{0.30cm}
-    \hspace*{0.72cm}\begin{minipage}{0.70\paperwidth}\raggedright
-      {\fontsize{25}{30}\selectfont\bfseries\color{white}\inserttitle\par}
-      \vspace{0.28cm}{\large\color{UpGradRule}\insertsubtitle\par}
-    \end{minipage}
-    \vfill
-    \hspace*{0.72cm}\vspace*{0.68cm}
-  \end{beamercolorbox}%
-}
-
-% \UpGradTitleSlide{title}{subtitle}{module}{deck kind}
-\newcommand{\UpGradTitleSlide}[4]{%
-  \title{#1}\subtitle{#2}\DeckMetadata{#3}{#4}%
-  \begin{frame}[plain]\titlepage\end{frame}%
-}
-% Used only where the source curriculum has not yet approved deck content.
-% It creates an honest, compilable hand-off deck without inventing instruction.
-\newcommand{\ContentPendingDeck}[2]{%
-  \UpGradTitleSlide{#1: #2}{Instructional content pending approval}{#1}{#2}%
-  \begin{frame}{Content status}
-    \begin{WarningBox}{No approved lesson material was supplied}
-      This deck is intentionally a source-and-PDF scaffold. Replace it with reviewed learning objectives, examples, exercises and references before learner delivery.
-    \end{WarningBox}
-  \end{frame}%
-  \begin{frame}{Author handoff}
-    \begin{itemize}
-      \item Start from the approved session plan and define observable learning objectives.
-      \item Add session-local assets under \InlineCode{assets/}; keep reusable components in the shared theme.
-      \item Compile with \InlineCode{make deck DECK=...} and review the resulting PDF before release.
-    \end{itemize}
-  \end{frame}%
-}
-
-% Section / agenda primitives.
-\newcommand{\AgendaSlide}[1]{%
-  \begin{frame}{Today}\small #1\end{frame}%
-}
-% A topic is the independently compilable unit inside a session. Put one
-% \TopicEntry per item inside \SessionTopicsSlide, then use \TopicDivider at
-% the beginning of each topic source.
-\newcommand{\TopicEntry}[3]{\item[] \textcolor{UpGradRed}{\bfseries #1}\hspace{.35em}\textbf{#2}\par\scriptsize\color{UpGradSlate}#3\normalsize\vspace{.28cm}}
-\newcommand{\SessionTopicsSlide}[1]{%
-  \begin{frame}{Session map}
-    \vspace{.08cm}\small\begin{enumerate}\setlength{\itemsep}{.18cm}#1\end{enumerate}
-    \vfill\Citation{Each topic can be compiled alone while this session file assembles the complete learner deck.}
-  \end{frame}%
-}
-\newcommand{\TopicDivider}[3]{%
-  {\setbeamercolor{background canvas}{bg=UpGradDeep}%
-  \begin{frame}[plain]
-    \vspace*{.72cm}\hspace*{.72cm}{\color{UpGradRed}\bfseries\large TOPIC\enspace#1}\par
-    \vfill\hspace*{.72cm}\begin{minipage}{.80\paperwidth}
-      {\fontsize{29}{34}\selectfont\bfseries\color{white}#2\par}\vspace{.26cm}
-      {\large\color{UpGradRule}#3\par}
-    \end{minipage}\vfill
-    \hspace*{.72cm}{\scriptsize\color{UpGradMist}\UpGradModule\enspace/\enspace\UpGradDeckKind}\vspace*{.58cm}
-  \end{frame}}%
-}
-% This intentionally emits a title slide only when the topic is compiled as a
-% subfile. In the assembled session, the parent title and topic divider remain.
-% Usage: \TopicStandaloneTitle{01}{Topic title}{Session subtitle}
-\newcommand{\TopicStandaloneTitle}[3]{%
-  \ifSubfilesClassLoaded{%
-    \title{Topic #1: #2}\subtitle{#3}\gdef\UpGradDeckKind{Topic #1}%
-    \begin{frame}[plain]\titlepage\end{frame}%
-  }{}%
-}
-% \SectionDivider{number}{heading}{one-sentence teaching intent}
-\newcommand{\SectionDivider}[3]{%
-  \begin{frame}[plain]
-    \vfill
-    {\color{UpGradRed}\bfseries\large #1}\par\vspace{0.22cm}
-    {\fontsize{25}{30}\selectfont\bfseries\color{UpGradInk}#2\par}\vspace{0.28cm}
-    {\large\color{UpGradSlate}#3\par}
-    \vfill
-  \end{frame}%
-}
-
-% Teaching-pattern boxes. Keep their titles semantic: authors choose the message,
-% not a colour or a layout on every slide.
-\newtcolorbox{UpGradBaseBox}[2][]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,colframe=UpGradRule,left=3.2mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradInk,title={#2},#1}
-\newtcolorbox{LearningObjectives}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradInk,title={#1}}
-\newtcolorbox{DefinitionBox}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradBlue},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradBlue,title={Definition\enspace--\enspace#1}}
-\newtcolorbox{ConceptBox}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradRedDark,title={#1}}
-\newtcolorbox{ExampleBox}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradGreen},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradGreen,title={Example\enspace--\enspace#1}}
-\newtcolorbox{WarningBox}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradAmber},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradAmber,title={Watch for\enspace--\enspace#1}}
-\newtcolorbox{QuestionBox}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradBlue},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradBlue,title={Question\enspace--\enspace#1}}
-\newtcolorbox{ExerciseBox}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradRedDark,title={Try it\enspace--\enspace#1}}
-\newtcolorbox{CaseStudyBox}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradInk},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradInk,title={Case study\enspace--\enspace#1}}
-\newtcolorbox{TakeawayBox}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradRed!7!white,colbacktitle=UpGradRed!7!white,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradRedDark,title={Key takeaway\enspace--\enspace#1}}
-\newtcolorbox{CodeCallout}[1]{enhanced,sharp corners,boxrule=0pt,
-  colback=UpGradMist,colbacktitle=UpGradMist,borderline west={2.2pt}{0pt}{UpGradRed},left=3.8mm,right=3.2mm,top=2.3mm,bottom=2.3mm,
-  fonttitle=\bfseries,coltitle=UpGradRedDark,title={#1}}
-% TeXScience is the portable scientific-diagram layer. It relies only on the
-% local TeX distribution: TikZ/PGFPlots, siunitx, circuitikz, chemfig and
-% tikz-3dplot. It deliberately does not require shell escape or a web service.
-\newtcolorbox{ScientificFigure}[1]{enhanced,sharp corners,boxrule=.35pt,
-  colback=white,colframe=UpGradRule,left=3.2mm,right=3.2mm,top=2.4mm,bottom=2.4mm,
-  fonttitle=\bfseries,coltitle=UpGradInk,title={#1}}
-\newcommand{\ScienceCaption}[1]{\par\smallskip{\scriptsize\color{UpGradSlate}#1}}
-\newcommand{\ScienceUnit}[2]{\SI{#1}{#2}}
-
-\newcommand{\TwoColumnLayout}[2]{%
-  \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.485\textwidth}#1\end{column}
-    \begin{column}{0.485\textwidth}#2\end{column}
-  \end{columns}%
-}
-% tabularx scans its complete body; environ safely captures our semantic wrapper
-% before passing it to tabularx, retaining both X columns and a clean API.
-\NewEnviron{UpGradTable}[1]{\renewcommand{\arraystretch}{1.25}\small\rowcolors{2}{UpGradMist}{white}\begin{tabularx}{\linewidth}{#1}\BODY\end{tabularx}}
-\newcommand{\TableHeaderRow}{\rowcolor{UpGradInk}}
-\newcommand{\TableHead}[1]{\color{white}\bfseries #1}
-
-% Figures are constrained by default. Authors may add trim/clip/width options.
-\newcommand{\DeckImage}[3][]{%
-  \begin{figure}\centering
-    \includegraphics[width=\linewidth,height=.59\textheight,keepaspectratio,#1]{#2}%
-    \ifstrempty{#3}{}{\caption{#3}}%
-  \end{figure}%
-}
-\newcommand{\SideBySideFigures}[5][]{%
-  \begin{figure}\centering
-    \begin{minipage}[t]{.485\linewidth}\centering\includegraphics[width=\linewidth,height=.48\textheight,keepaspectratio,#1]{#2}\\[-1mm]\scriptsize\color{UpGradSlate}#3\end{minipage}\hfill
-    \begin{minipage}[t]{.485\linewidth}\centering\includegraphics[width=\linewidth,height=.48\textheight,keepaspectratio,#1]{#4}\\[-1mm]\scriptsize\color{UpGradSlate}#5\end{minipage}
-  \end{figure}%
-}
-% Use percentages inside this environment: \ScreenshotCallout{68}{63}{Model artefact}.
-\newenvironment{AnnotatedScreenshot}[2]{%
-  \begin{figure}\centering\def\UpGradScreenshotCaption{#2}%
-  \begin{overpic}[width=\linewidth,height=.58\textheight,keepaspectratio]{#1}%
-}{%
-  \end{overpic}\ifstrempty{\UpGradScreenshotCaption}{}{\caption{\UpGradScreenshotCaption}}\end{figure}%
-}
-\newcommand{\ScreenshotCallout}[3]{\put(#1,#2){\makebox(0,0)[l]{\colorbox{UpGradRed}{\scriptsize\color{white}\strut\hspace{1.4mm}#3\hspace{1.4mm}}}}}
-
-% listings is the baseline: available in the supplied TeX toolchain, requires no
-% shell escape, and supports Python, SQL, Bash, JSON, YAML-as-text and custom keys.
 \lstdefinelanguage{JSON}{morestring=[b]",morecomment=[l]{//},morekeywords={true,false,null}}
 \lstdefinelanguage{YAML}{sensitive=false,morecomment=[l]{\#},morestring=[b]",morekeywords={true,false,yes,no,null}}
 \lstdefinestyle{UpGradCode}{%
   backgroundcolor=\color{UpGradCode},basicstyle=\ttfamily\scriptsize\color{UpGradInk},
-  commentstyle=\color{UpGradGreen},keywordstyle=\bfseries\color{UpGradBlue},stringstyle=\color{UpGradRedDark},
+  commentstyle=\color{AWSEmerald},keywordstyle=\bfseries\color{AWSBlue},stringstyle=\color{UpGradRedDark},
   frame=single,framerule=0pt,rulecolor=\color{UpGradRule},framesep=4pt,
   breaklines=true,breakatwhitespace=false,columns=fullflexible,keepspaces=true,
   showstringspaces=false,tabsize=2,numbers=left,numberstyle=\tiny\color{UpGradMuted},numbersep=6pt,
@@ -303,13 +472,11 @@
     \ifnum\value{lstnumber}=\UpGradLineCandidate\relax\def\UpGradLineMatch{1}\fi}%
   \ifnum\UpGradLineMatch=1\color{UpGradCodeHighlight}\fi}
 \makeatother
+
 \lstnewenvironment{CodeBlock}[2][]{\lstset{style=UpGradCode,language=#2,#1}}{}
-% Usage: \begin{HighlightedCodeBlock}[numbers=left]{Python}{3,4} ... \end{HighlightedCodeBlock}
 \lstnewenvironment{HighlightedCodeBlock}[3][]{\gdef\UpGradHighlightedLines{#3}\lstset{style=UpGradCode,language=#2,#1}}{\gdef\UpGradHighlightedLines{}}
 \newcommand{\InlineCode}[1]{{\ttfamily\color{UpGradRedDark}\small #1}}
-% Keep longer, annotated snippets in a small source file. This places the code and
-% its teaching note together without manual positioning.
-% \CodeFromFileWithCallout[listing options]{language}{file}{highlighted lines}{callout title}{callout text}
+
 \newcommand{\CodeFromFileWithCallout}[6][]{%
   \begin{columns}[T,onlytextwidth]
     \begin{column}{.61\textwidth}\begingroup\gdef\UpGradHighlightedLines{#4}\lstinputlisting[style=UpGradCode,language=#2,numbers=left,#1]{#3}\endgroup\end{column}
@@ -317,21 +484,43 @@
   \end{columns}%
 }
 
-% Diagram primitives work with ordinary TikZ; no external asset library required.
+% -----------------------------------------------------------------------------
+% Diagram & Flow Primitives (TikZ)
+% -----------------------------------------------------------------------------
 \tikzset{
-  upgrad/service/.style={rounded corners=2pt,draw=UpGradRule,fill=UpGradMist,very thick,minimum width=2.15cm,minimum height=.75cm,align=center,font=\small\bfseries\color{UpGradInk}},
-  upgrad/data/.style={upgrad/service,fill=UpGradRed!7!white,draw=UpGradRed!45!white},
-  upgrad/model/.style={upgrad/service,fill=UpGradBlue!7!white,draw=UpGradBlue!45!white},
-  upgrad/flow/.style={-{Latex[length=2mm]},very thick,draw=UpGradSlate},
-  upgrad/callout/.style={rounded corners=1pt,fill=UpGradRed,text=white,font=\scriptsize\bfseries,inner xsep=2.2mm,inner ysep=1.2mm},
-  upgrad/science node/.style={rounded corners=1.5pt,draw=UpGradBlue!55!white,fill=UpGradBlue!6!white,minimum height=.62cm,align=center,font=\small\bfseries\color{UpGradInk}},
-  upgrad/measurement/.style={-{Latex[length=1.6mm]}-{Latex[length=1.6mm]},draw=UpGradRed,very thick}
+  upgrad/service/.style={rounded corners=1.5mm,draw=UpGradRule,fill=UpGradMist,thick,minimum width=2.15cm,minimum height=.72cm,align=center,font=\small\bfseries\color{UpGradNight}},
+  upgrad/data/.style={upgrad/service,fill=AWSOrange!10!white,draw=AWSOrange!60!white},
+  upgrad/model/.style={upgrad/service,fill=AWSBlue!10!white,draw=AWSBlue!60!white},
+  upgrad/flow/.style={-{Latex[length=2.0mm]},thick,draw=UpGradSlate},
+  upgrad/callout/.style={rounded corners=1.0mm,fill=UpGradRed,text=white,font=\scriptsize\bfseries,inner xsep=2.2mm,inner ysep=1.2mm},
+  upgrad/science node/.style={rounded corners=1.2mm,draw=AWSBlue!55!white,fill=AWSBlue!6!white,minimum height=.62cm,align=center,font=\small\bfseries\color{UpGradInk}},
+  upgrad/measurement/.style={-{Latex[length=1.6mm]}-{Latex[length=1.6mm]},draw=UpGradRed,thick}
 }
+
 \pgfplotsset{upgrad/science plot/.style={
   axis line style={draw=UpGradSlate},tick style={draw=UpGradSlate},
   tick label style={font=\scriptsize,color=UpGradSlate},label style={font=\scriptsize,color=UpGradSlate},
   grid=major,grid style={draw=UpGradRule,line width=.25pt},legend style={font=\scriptsize,draw=none,fill=none},
   every axis plot/.append style={very thick},width=.88\linewidth,height=.42\textheight
 }}
+
 \newcommand{\Citation}[1]{{\scriptsize\color{UpGradMuted}#1}}
 \newenvironment{References}{\begin{frame}[fragile,environment=References]{References}\footnotesize\color{UpGradSlate}\begin{itemize}}{\end{itemize}\end{frame}}
+
+\newcommand{\ContentPendingDeck}[2]{%
+  \UpGradTitleSlide{#1: #2}{Instructional content pending approval}{#1}{#2}%
+  \begin{frame}{Content Status}
+    \begin{WarningBox}{No Approved Lesson Material Supplied}
+      This deck is intentionally a source-and-PDF scaffold. Replace it with reviewed learning objectives, AWS architecture patterns, code examples and references before learner delivery.
+    \end{WarningBox}
+  \end{frame}%
+  \begin{frame}{Author Handoff}
+    \begin{itemize}
+      \item Start from the approved session plan and define observable learning objectives.
+      \item Add session-local assets under \InlineCode{assets/}; keep reusable components in the shared theme.
+      \item Compile with \InlineCode{make deck DECK=...} and review the resulting PDF before release.
+    \end{itemize}
+  \end{frame}%
+}
+
+\endinput

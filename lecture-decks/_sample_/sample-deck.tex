@@ -1,261 +1,382 @@
 \documentclass[aspectratio=169,10pt]{beamer}
 \usepackage{subfiles}
 \usepackage[science]{upgradbeamer}
-\DeckMetadata{Sample framework}{Living documentation}
-\author{UpGrad Learning Team}
+\DeckMetadata{Data Science on AWS}{Enterprise Masterclass Deck}
+\author{upGrad Enterprise Cloud Faculty}
 \date{}
 
 \begin{document}
 
-\UpGradTitleSlide{From data to a deployable churn signal}{A compact Applied AI and AWS teaching pattern library}{Sample framework}{Living documentation}
+% -----------------------------------------------------------------------------
+% Title & Course Roadmap
+% -----------------------------------------------------------------------------
+\UpGradTitleSlide{Data Science \& MLOps on AWS}{Enterprise Architectures for S3 Data Lakes, Serverless Analytics, SageMaker Distributed ML \& Bedrock GenAI}{Data Science on AWS}{Executive \& Technical Masterclass}
 
 \SessionTopicsSlide{
-  \TopicEntry{01}{Frame the decision}{Connect a business decision, a target and a point-in-time data contract.}
-  \TopicEntry{02}{Build the baseline}{Use reproducible Python, SQL and an architecture with traceable responsibilities.}
-  \TopicEntry{03}{Close the loop}{Practise judgment and end with an operational takeaway.}
-  \TopicEntry{04}{TeXScience diagrams}{Use editable scientific plots and diagrams without a remote rendering dependency.}
+  \TopicEntry{01}{S3 Data Lake Architecture \& Partitioning Strategy}{Storage classes, prefix request throughput, Hive-style partitioning, and durability.}
+  \TopicEntry{02}{Serverless Analytics with AWS Glue \& Athena}{Data Catalog, crawler schema discovery, Snappy Parquet columnar layout, and cost optimization.}
+  \TopicEntry{03}{Scalable ML with SageMaker \& Distributed XGBoost}{Managed container lifecycle, objective function math derivation, and Spot training.}
+  \TopicEntry{04}{Production MLOps, CI/CD \& Real-Time Monitoring}{SageMaker Pipelines DAG, real-time vs serverless endpoints, and statistical drift detection.}
+  \TopicEntry{05}{Enterprise Generative AI with Amazon Bedrock \& RAG}{Foundation models, Titan dense embeddings, vector retrieval, and zero-retention privacy.}
 }
 
-\subfile{topics/topic-04-texscience}
+% =============================================================================
+% SESSION 01: S3 DATA LAKE ARCHITECTURE
+% =============================================================================
+\TopicDivider{01}{S3 Data Lake Architecture}{Storage tiers, prefix sharding, and point-in-time partitioning.}
 
-\begin{frame}{Agenda}
-  \begin{enumerate}
-    \item Frame the learner's decision and the data needed to support it.
-    \item Build a reproducible baseline in Python and SQL.
-    \item Move from notebook insight to an AWS-ready delivery path.
-    \item Practise the judgment calls that make a model useful.
-  \end{enumerate}
-\end{frame}
-
-\SectionDivider{01}{Start with a decision}{A useful model changes a decision; accuracy is only one part of the story.}
-
-\begin{frame}{A normal content slide: define the learning path}
-  \TwoColumnLayout{
-    \begin{ConceptBox}{Business question}
-      Which subscribers should receive a retention offer this week, given a limited outreach budget?
-    \end{ConceptBox}
-    \vspace{0.25cm}
-    \begin{itemize}
-      \item Decision owner: customer-success lead
-      \item Unit: one active subscriber
-      \item Outcome horizon: churn in the next 30 days
-    \end{itemize}
-  }{
-    \begin{ExampleBox}{A measurable first hypothesis}
-      Recent support friction, low tenure and a falling engagement trend may raise churn risk.
-    \end{ExampleBox}
-    \vspace{0.25cm}
-    \begin{itemize}
-      \item Train on observations available before outreach.
-      \item Compare against a no-model targeting baseline.
-      \item Review false positives with the operations team.
-    \end{itemize}
-  }
-\end{frame}
-
-\begin{frame}{Dense teaching slide: the minimum viable data contract}
-  \small
-  \begin{UpGradTable}{>{\raggedright\arraybackslash}p{.23\linewidth} >{\raggedright\arraybackslash}p{.23\linewidth} X}
-    \TableHeaderRow \TableHead{Field} & \TableHead{Available at scoring time?} & \TableHead{Why it belongs (or does not)} \\
-    \texttt{tenure\_months} & Yes & Account age recorded on the scoring date. \\
-    \texttt{support\_tickets\_30d} & Yes & Recent friction; define timezone and ticket-status rules. \\
-    \texttt{cancelled\_at} & No & Future outcome: using it would leak the answer. \\
-    \texttt{plan} & Yes & Categorical context; preserve an \InlineCode{unknown} route. \\
-    \texttt{offer\_accepted} & Depends & Include only if offer assignment preceded the outcome. \\
-  \end{UpGradTable}
-  \vspace{0.18cm}
-  \begin{WarningBox}{Time leakage is a product bug}
-    If a column is created after the decision, a high offline score can be misleading rather than useful.
-  \end{WarningBox}
-\end{frame}
-
-\begin{frame}{Learning objectives}
+\begin{frame}{Learning Objectives: S3 Data Lake Design}
   \begin{LearningObjectives}{By the end of this session, learners can}
     \begin{itemize}
-      \item translate a retention decision into a supervised-learning target;
-      \item build a preprocessing-and-model pipeline without feature leakage;
-      \item write a query that produces a point-in-time feature table; and
-      \item explain how a model artefact reaches a monitored endpoint.
+      \item Design S3 bucket topologies optimized for high-throughput distributed parallel access.
+      \item Eliminate prefix request throttling by structuring deterministic date/entity partition keys.
+      \item Configure intelligent lifecycle policies that transition raw datasets to archive tiers.
+      \item Enforce point-in-time correctness to prevent feature leakage across ML training pipelines.
     \end{itemize}
   \end{LearningObjectives}
 \end{frame}
 
-\begin{frame}{A concept and its boundary}
-  \begin{DefinitionBox}{Point-in-time correctness}
-    Every feature value must be computed only from information available on or before the timestamp at which the prediction is made.
-  \end{DefinitionBox}
-  \vspace{0.28cm}
-  \TwoColumnLayout{
-    \begin{ExampleBox}{Correct}
-      Score on 1 July using support tickets opened through 30 June.
-    \end{ExampleBox}
-  }{
-    \begin{WarningBox}{Incorrect}
-      Score on 1 July using a ``days since cancellation'' field populated on 15 July.
-    \end{WarningBox}
+\begin{frame}{S3 Cloud Storage Throughput \& Durability}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSOrange}{3,500}{PUT / COPY / POST}{Per partitioned prefix/sec}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSBlue}{5,500}{GET / HEAD}{Requests/sec per prefix}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSEmerald}{11 9s}{Data Durability}{99.999999999\% cross-AZ}
+    \end{column}
+  \end{columns}
+  \vspace{0.20cm}
+  \begin{ConceptBox}{Horizontal Prefix Partitioning}
+    S3 automatically scales storage partitions behind distinct prefix paths. By prefixing telemetry logs with \InlineCode{s3://lake/events/year=2026/month=09/day=14/}, distributed readers achieve linear scaling across thousands of parallel workers.
+  \end{ConceptBox}
+\end{frame}
+
+\begin{frame}{Storage Tiering \& Cost Optimization Matrix}
+  \CompareGrid{S3 Standard \& Express One Zone}{
+    \begin{itemize}
+      \item Single-digit millisecond data access.
+      \item Express One Zone: Sub-10ms latency for real-time model feature retrieval.
+      \item High-frequency read/write ML scratch space.
+    \end{itemize}
+  }{S3 Intelligent-Tiering \& Glacier}{
+    \begin{itemize}
+      \item Automatically moves data based on access patterns.
+      \item Zero operational overhead or retrieval fees.
+      \item Glacier Flexible / Deep Archive: \$0.00099/GB/mo for compliance audit trails.
+    \end{itemize}
   }
+  \vspace{0.18cm}
+  \begin{WarningBox}{Avoid Sequential Monolithic Keys}
+    Prefixes beginning with sequential auto-incrementing IDs (e.g. \InlineCode{id\_0001}, \InlineCode{id\_0002}) hash to identical S3 internal physical partitions, causing HTTP 503 SlowDown throttling under peak distributed reads.
+  \end{WarningBox}
 \end{frame}
 
-\SectionDivider{02}{Make the baseline reproducible}{A small, explicit pipeline is easier to debug, explain and deploy.}
-
-\begin{frame}[fragile]{Python: highlight the lines that matter}
-  \begin{HighlightedCodeBlock}[numbers=left]{Python}{7,10,11}
-features = ["monthly_spend", "tenure_months", "support_tickets", "plan"]
-preprocess = ColumnTransformer([
-    ("numeric", StandardScaler(), features[:3]),
-    ("category", OneHotEncoder(handle_unknown="ignore"), ["plan"]),
-])
-model = Pipeline([
-    ("prepare", preprocess),
-    ("classifier", LogisticRegression(max_iter=1_000)),
-])
-model.fit(train[features], train["churned"])
-probability = model.predict_proba(customer[features])[:, 1]
-  \end{HighlightedCodeBlock}
-  \vspace{0.14cm}
-  \Citation{Highlighted lines are selected with \InlineCode{\{7,10,11\}}; use \InlineCode{numbers=left} when learners need to discuss a line precisely.}
-\end{frame}
-
-\begin{frame}[fragile]{Code plus an adjacent teaching annotation}
-  \CodeFromFileWithCallout{Python}{assets/code/train_churn_model.py}{11,13,14}{Lines 11, 13--14: train and infer}{
-    The pipeline keeps preprocessing and the classifier together. \textbf{Line 13} learns parameters only from the training split; \textbf{line 14} produces a probability, not a retention decision. The business threshold is a separate policy choice.
-  }
-\end{frame}
-
-\begin{frame}[fragile]{SQL: create a stable feature snapshot}
-  \begin{CodeBlock}[numbers=left]{SQL}
-WITH feature_snapshot AS (
-  SELECT
-    customer_id,
-    DATE '2026-06-30' AS scored_on,
-    COUNTIF(created_at >= DATE_SUB(DATE '2026-06-30', INTERVAL 30 DAY))
-      AS support_tickets_30d,
-    MAX(plan) AS plan
-  FROM analytics.support_events
-  WHERE created_at < TIMESTAMP '2026-07-01 00:00:00 UTC'
-  GROUP BY customer_id
-)
-SELECT * FROM feature_snapshot;
-  \end{CodeBlock}
-  \Citation{The exclusive upper bound is intentional: the snapshot must not read events that arrive after scoring begins.}
-\end{frame}
-
-\begin{frame}{AWS Console screenshot placeholder}
-  \centering
-  \begin{tikzpicture}[x=.88cm,y=.88cm]
-    \fill[UpGradInk] (0,4.75) rectangle (11.5,5.45);
-    \node[anchor=west,text=white,font=\small\bfseries] at (.30,5.10) {AWS Console \quad Amazon SageMaker};
-    \fill[UpGradMist] (0,0) rectangle (2.35,4.75);
-    \draw[UpGradRule] (0,0) rectangle (11.5,5.45);
-    \node[anchor=west,font=\scriptsize\bfseries,text=UpGradSlate] at (.28,4.25) {SageMaker resources};
-    \foreach \pos/\label in {3.72/Studio,3.28/Notebooks,2.84/Training jobs,2.40/Models,1.96/Endpoints}{
-      \node[anchor=west,font=\scriptsize,text=UpGradInk] at (.45,\pos) {\label};}
-    \node[anchor=west,font=\large\bfseries,text=UpGradInk] at (2.80,4.25) {Create endpoint};
-    \node[anchor=west,font=\small,text=UpGradSlate] at (2.80,3.72) {Model name};
-    \draw[UpGradRule,fill=white] (2.80,3.10) rectangle (8.65,3.55);
-    \node[anchor=west,font=\small,text=UpGradInk] at (3.00,3.33) {churn-baseline-v1};
-    \node[anchor=west,font=\small,text=UpGradSlate] at (2.80,2.62) {Instance type};
-    \draw[UpGradRule,fill=white] (2.80,2.00) rectangle (8.65,2.45);
-    \node[anchor=west,font=\small,text=UpGradInk] at (3.00,2.23) {ml.m5.large};
-    \fill[UpGradRed] (8.85,.62) rectangle (10.80,1.15);
-    \node[text=white,font=\scriptsize\bfseries] at (9.83,.885) {Create endpoint};
-    \node[upgrad/callout,anchor=west] at (8.78,3.34) {model artefact};
-    \draw[UpGradRed,very thick,-{Latex[length=1.6mm]}] (8.70,3.30) -- (8.25,3.30);
-  \end{tikzpicture}
-  \vspace{.12cm}\par{\scriptsize\color{UpGradSlate}A self-contained placeholder. Replace this TikZ mock with \InlineCode{\textbackslash begin\{AnnotatedScreenshot\}\{assets/aws-endpoint.png\}\{...\}} and add percentage-positioned \InlineCode{\textbackslash ScreenshotCallout}s.}
-\end{frame}
-
-\begin{frame}{Architecture: separate responsibilities, preserve traceability}
-  \centering
-  \begin{tikzpicture}[node distance=1.15cm and .72cm]
-    \node[upgrad/data] (s3) {S3\\raw events};
-    \node[upgrad/service,right=of s3] (glue) {Glue\\feature job};
-    \node[upgrad/model,right=of glue] (train) {SageMaker\\training};
-    \node[upgrad/model,right=of train] (endpoint) {SageMaker\\endpoint};
-    \node[upgrad/service,below=of train] (registry) {Model registry\\metrics + approval};
-    \draw[upgrad/flow] (s3) -- (glue);
-    \draw[upgrad/flow] (glue) -- (train);
-    \draw[upgrad/flow] (train) -- (endpoint);
-    \draw[upgrad/flow] (train) -- (registry);
-    \draw[upgrad/flow] (registry) -| (endpoint);
-  \end{tikzpicture}
-  \vspace{.35cm}
-  \begin{TakeawayBox}{A deployment is a chain of evidence}
-    The endpoint should be traceable to a versioned dataset, training run, evaluation result and approval decision.
-  \end{TakeawayBox}
-\end{frame}
-
-\begin{frame}{Compare options against the decision constraint}
+\begin{frame}{Enterprise Data Lake Multi-Zone Topology}
   \small
-  \begin{UpGradTable}{>{\raggedright\arraybackslash}p{.22\linewidth} X X X}
-    \TableHeaderRow \TableHead{Option} & \TableHead{Strength} & \TableHead{Risk} & \TableHead{Use when} \\
-    Logistic regression & Fast, inspectable baseline & Misses non-linear interactions & You need a transparent benchmark. \\
-    Gradient boosting & Strong tabular accuracy & More tuning and monitoring & Incremental lift justifies complexity. \\
-    Rules only & Easy to audit & Brittle thresholds, limited coverage & Policy rules are explicit. \\
+  \begin{UpGradTable}{>{\bfseries\color{AWSSquid}}p{.18\linewidth} p{.22\linewidth} p{.25\linewidth} X}
+    \TableHeaderRow \TableHead{Data Zone} & \TableHead{Format \& Codec} & \TableHead{Target AWS Service} & \TableHead{Access Policy \& SLA} \\
+    Raw / Bronze & Raw JSON, CSV, GZIP & AWS Kinesis Firehose & Immutable landing zone; 30-day lifecycle to Glacier. \\
+    Clean / Silver & Snappy Parquet & AWS Glue ETL, EMR & Schema validated, deduplicated, partitioned by date. \\
+    Curated / Gold & Optimized Parquet / Delta & Amazon Redshift, Athena & Aggregate feature tables; indexed for ML training. \\
+    Feature Store & Online (DynamoDB) / S3 & SageMaker Feature Store & Sub-10ms online inference lookup + offline historical join. \\
   \end{UpGradTable}
+  \vfill
+  {\scriptsize\color{UpGradSlate}*Note: Immutable partitioned prefixes guarantee zero data corruption across multi-tenant reader clusters.}
 \end{frame}
 
-\begin{frame}{A question for the room}
-  \begin{QuestionBox}{Which threshold should trigger an outreach offer?}
-    A probability of 0.62 is not automatically ``high enough''. What are the cost of a false positive, the value of a retained subscriber, and the daily outreach capacity?
-  \end{QuestionBox}
-  \vspace{0.35cm}
+\begin{frame}{Point-in-Time Correctness \& Anti-Leakage Rules}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{.48\textwidth}
+      \begin{ConceptBox}{Point-in-Time Correctness}
+        Every training feature value must be evaluated exclusively against information existing on or before the observation timestamp $T_0$.
+      \end{ConceptBox}
+    \end{column}
+    \begin{column}{.48\textwidth}
+      \begin{WarningBox}{Temporal Target Leakage}
+        Using features updated after the business decision timestamp $T_0$ inflates offline validation metrics while causing catastrophic live degradation.
+      \end{WarningBox}
+    \end{column}
+  \end{columns}
+  \vspace{0.18cm}
+  \TakeawayBanner{Prefix partitioning with Hive standard YYYY/MM/DD enables partition pruning and linear IOPS scaling.}
+\end{frame}
+
+% =============================================================================
+% SESSION 02: SERVERLESS ANALYTICS (GLUE & ATHENA)
+% =============================================================================
+\TopicDivider{02}{Serverless Data Engineering}{Cataloging with Glue, querying with Athena, and Parquet columnar layout.}
+
+\begin{frame}{AWS Glue Data Catalog \& Crawlers}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{.48\textwidth}
+      \AWSServiceCard{AWS Glue Data Catalog}{METADATA}{Unified Apache Hive-compliant metadata repository storing table schemas, partition statistics, and data types.}{Serverless Catalog}
+    \end{column}
+    \begin{column}{.48\textwidth}
+      \AWSServiceCard{Amazon Athena}{ANALYTICS}{Presto-powered distributed query engine reading structured data directly from S3 without cluster management.}{Serverless SQL}
+    \end{column}
+  \end{columns}
+  \vspace{0.20cm}
+  \begin{ConceptBox}{Schema Evolution \& Crawler Classification}
+    Glue Crawlers inspect raw data files in S3, infer schemas (JSON, Parquet, CSV), detect schema drift, and update the Central Catalog automatically without manual DDL maintenance.
+  \end{ConceptBox}
+\end{frame}
+
+\begin{frame}{Columnar Format Efficiency: Parquet vs CSV}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSEmerald}{87\%}{Storage Savings}{Snappy Parquet vs raw CSV}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSOrange}{\$0.024}{Per Query Cost}{Scanned 4.8GB instead of 1.2TB}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSBlue}{6.4\(\times\)}{Query Speedup}{Vectorized columnar scan}
+    \end{column}
+  \end{columns}
+  \vspace{0.20cm}
+  \begin{DefinitionBox}{Predicate Pushdown \& Column Pruning}
+    Because Apache Parquet stores data column-by-column with dictionary encoding and min/max row group metadata, Amazon Athena reads only the queried columns and skips irrelevant data blocks entirely.
+  \end{DefinitionBox}
+\end{frame}
+
+\begin{frame}[fragile]{PySpark Glue ETL Pipeline}
+  \begin{HighlightedCodeBlock}{Python}{5,6,10}
+import sys
+from awsglue.context import GlueContext
+from pyspark.context import SparkContext
+
+# Initialize Serverless Spark Execution Context
+sc = SparkContext.getOrCreate()
+glueContext = GlueContext(sc)
+
+# DynamicFrame read from Catalog, partition and write Snappy Parquet
+dyf = glueContext.create_dynamic_frame.from_catalog(database="telecom_db", table_name="raw_events")
+glueContext.write_dynamic_frame.from_options(
+    frame=dyf, connection_type="s3",
+    connection_options={"path": "s3://lake-gold/events/", "partitionKeys": ["event_year", "event_month"]},
+    format="parquet", format_options={"compression": "snappy"}
+)
+  \end{HighlightedCodeBlock}
+\end{frame}
+
+\begin{frame}{Serverless Analytics Architecture}
+  \ArchitectureCard{Serverless S3 to Athena \& SageMaker Analytics Pipeline}{
+    \begin{tikzpicture}[scale=0.88,every node/.style={transform shape}]
+      \node[upgrad/data] (s3raw) {S3 Raw Landing\\{\scriptsize JSON / CSV}};
+      \node[upgrad/service,right=1.2cm of s3raw] (glue) {AWS Glue ETL\\{\scriptsize PySpark Serverless}};
+      \node[upgrad/data,right=1.2cm of glue] (s3cur) {S3 Curated Lake\\{\scriptsize Snappy Parquet}};
+      \node[upgrad/model,above right=0.3cm and 1.2cm of s3cur] (athena) {Amazon Athena\\{\scriptsize Presto SQL Engine}};
+      \node[upgrad/service,below right=0.3cm and 1.2cm of s3cur] (sm) {SageMaker\\{\scriptsize Feature Store / Training}};
+
+      \draw[upgrad/flow] (s3raw) -- (glue);
+      \draw[upgrad/flow] (glue) -- (s3cur);
+      \draw[upgrad/flow] (s3cur) |- (athena);
+      \draw[upgrad/flow] (s3cur) |- (sm);
+    \end{tikzpicture}
+  }{Zero server management; pay strictly per gigabyte scanned (\$5.00/TB scanned in Amazon Athena).}
+\end{frame}
+
+% =============================================================================
+% SESSION 03: SCALABLE ML WITH SAGEMAKER & XGBOOST
+% =============================================================================
+\TopicDivider{03}{SageMaker Distributed Training}{Managed Docker containers, objective function derivation, and Spot instances.}
+
+\begin{frame}{SageMaker Managed Training Architecture}
   \TwoColumnLayout{
-    \textbf{Discuss}\begin{itemize}\item What action follows a positive prediction?\item Who is harmed by an unnecessary offer?\end{itemize}
+    \begin{ConceptBox}{Containerized Training Jobs}
+      \begin{itemize}
+        \item Ephemeral compute clusters provisioned on demand.
+        \item Automatic bootstrap: copies code, attaches EBS volumes, downloads dataset.
+        \item Built-in algorithms (XGBoost, Linear Learner) or custom PyTorch/TensorFlow containers.
+        \item Automatic termination immediately upon job completion.
+      \end{itemize}
+    \end{ConceptBox}
   }{
-    \textbf{Measure}\begin{itemize}\item precision among contacted subscribers\item incremental retention against a control group\end{itemize}
+    \begin{ConceptBox}{Data Ingestion Modes}
+      \begin{itemize}
+        \item \textbf{File Mode}: Downloads complete S3 dataset to instance EBS before training starts.
+        \item \textbf{Fast File Mode}: Mounts S3 as a read-only POSIX filesystem without download wait.
+        \item \textbf{Pipe Mode}: Streams dataset directly from S3 into FIFO pipes in memory.
+      \end{itemize}
+    \end{ConceptBox}
   }
 \end{frame}
 
-\begin{frame}{Exercise: repair the evaluation design}
-  \begin{ExerciseBox}{Ten minutes, pairs}
-    A team trained on January--June data and randomly split rows into train and test. They report 92\% AUC, then score July subscribers. Identify two ways this design can overstate production performance. Redesign the split in one sentence.
-  \end{ExerciseBox}
-  \vspace{.28cm}
-  \begin{ExampleBox}{Facilitator debrief}
-    A time-based split better simulates deployment. Check that the label horizon ends before the evaluation period and that one customer cannot appear on both sides through repeated snapshots.
-  \end{ExampleBox}
+\begin{frame}{Mathematical Derivation: XGBoost Objective \& Taylor Expansion}
+  \MathDerivationStep{1}{\mathcal{L}^{(t)} = \sum_{i=1}^n l\left(y_i,\, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \Omega(f_t)}{Objective at boosting iteration $t$ with tree complexity penalty $\Omega(f_t) = \gamma T + \frac{1}{2}\lambda \sum_{j=1}^T w_j^2$}
+  \vspace{0.20cm}
+  \MathDerivationStep{2}{\tilde{\mathcal{L}}^{(t)} \approx \sum_{i=1}^n \left[ g_i f_t(x_i) + \frac{1}{2} h_i f_t^2(x_i) \right] + \gamma T + \frac{1}{2}\lambda \sum_{j=1}^T w_j^2}{Second-order Taylor expansion where $g_i = \partial_{\hat{y}^{(t-1)}} l$ and $h_i = \partial^2_{\hat{y}^{(t-1)}} l$}
 \end{frame}
 
-\begin{frame}{Case study: the model is right, the intervention is wrong}
-  \begin{CaseStudyBox}{Retention offer fatigue}
-    A model identifies high-risk annual-plan subscribers correctly. The team sends a discount to every one of them; renewal rises, but margin falls because many would have renewed without an offer.
+\begin{frame}{Mathematical Derivation: Optimal Leaf Weights \& Split Gain}
+  \MathDerivationStep{3}{w_j^* = -\frac{\sum_{i \in I_j} g_i}{\sum_{i \in I_j} h_i + \lambda},\qquad \mathcal{L}^* = -\frac{1}{2} \sum_{j=1}^T \frac{\left(\sum_{i \in I_j} g_i\right)^2}{\sum_{i \in I_j} h_i + \lambda} + \gamma T}{Exact closed-form optimal leaf weights $w_j^*$ for leaf partition $I_j$ and optimal objective score $\mathcal{L}^*$}
+  \vspace{0.20cm}
+  \begin{ConceptBox}{Structural Split Criterion}
+    For a candidate tree split into left and right instance subsets $I_L$ and $I_R$, the structural score gain is $\text{Gain} = \frac{1}{2} \left[ \frac{(\sum_{i \in I_L} g_i)^2}{\sum_{i \in I_L} h_i + \lambda} + \frac{(\sum_{i \in I_R} g_i)^2}{\sum_{i \in I_R} h_i + \lambda} - \frac{(\sum_{i \in I} g_i)^2}{\sum_{i \in I} h_i + \lambda} \right] - \gamma$.
+  \end{ConceptBox}
+\end{frame}
+
+\begin{frame}[fragile]{SageMaker Python SDK: Training with Spot Instances}
+  \begin{HighlightedCodeBlock}{Python}{6,7,9}
+from sagemaker.estimator import Estimator
+import sagemaker
+
+role = sagemaker.get_execution_role()
+image_uri = sagemaker.image_uris.retrieve("xgboost", "us-east-1", "1.7-1")
+
+xgb = Estimator(
+    image_uri=image_uri, role=role,
+    instance_count=2, instance_type="ml.m5.2xlarge",
+    use_spot_instances=True, max_run=3600, max_wait=7200,
+    checkpoint_s3_uri="s3://lake-ml-checkpoints/xgb-churn/"
+)
+xgb.set_hyperparameters(max_depth=5, eta=0.1, objective="binary:logistic", num_round=100)
+xgb.fit({"train": "s3://lake-gold/train/", "validation": "s3://lake-gold/validation/"})
+  \end{HighlightedCodeBlock}
+\end{frame}
+
+\begin{frame}{Training Optimization \& Throughput Metrics}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSOrange}{68\%}{Cost Savings}{SageMaker Managed Spot training}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSEmerald}{14.2\,GB/s}{Pipe Mode Throughput}{Zero local disk bottleneck}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSBlue}{0.941}{Validation ROC-AUC}{Optimized tree ensemble}
+    \end{column}
+  \end{columns}
+  \vspace{0.20cm}
+  \TakeawayBanner{Always configure checkpointing when using Spot instances to preserve state across node preemptions.}
+\end{frame}
+
+% =============================================================================
+% SESSION 04: PRODUCTION MLOPS & MODEL MONITORING
+% =============================================================================
+\TopicDivider{04}{MLOps \& Endpoint Lifecycle}{SageMaker Pipelines, real-time endpoints, and statistical drift detection.}
+
+\begin{frame}{Production Inference Options Comparison}
+  \CompareGrid{Real-Time Endpoints}{
+    \begin{itemize}
+      \item Dedicated multi-AZ EC2 instances (\InlineCode{ml.c6i.xlarge}).
+      \item Sub-15ms p99 latency SLA.
+      \item Auto-scales dynamically on request volume.
+      \item Ideal for high-throughput live applications.
+    \end{itemize}
+  }{Serverless Inference}{
+    \begin{itemize}
+      \item Zero infrastructure provisioning or idle costs.
+      \item Scales automatically from 0 to 200 concurrent workers.
+      \item Memory configured from 1024MB to 6144MB.
+      \item Ideal for intermittent, unpredictable burst workloads.
+    \end{itemize}
+  }
+  \vspace{0.18cm}
+  \begin{ConceptBox}{Shadow Deployments \& Canary Routing}
+    SageMaker allows routing 10\% of live traffic to a new challenger model while mirroring 100\% of requests to evaluate real-world performance without impacting production users.
+  \end{ConceptBox}
+\end{frame}
+
+\begin{frame}{SageMaker Model Monitor: Drift Detection}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSEmerald}{p99 11.4\,ms}{Inference Latency}{Triton Server on g5.xlarge}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSOrange}{\(\Delta \text{KS} > 0.05\)}{Drift Threshold}{Kolmogorov-Smirnov alert}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSPurple}{PSI > 0.20}{Population Shift}{Triggers automated retraining}
+    \end{column}
+  \end{columns}
+  \vspace{0.20cm}
+  \begin{CaseStudyBox}{Automated Continuous Training Loop}
+    When SageMaker Model Monitor detects feature attribution shift or Population Stability Index (PSI) $> 0.2$ on live scoring payloads stored in S3 Data Capture, an Amazon EventBridge rule triggers a SageMaker Pipeline execution to retrain on fresh data.
   \end{CaseStudyBox}
-  \vspace{.30cm}
-  \begin{itemize}
-    \item Prediction answers: \emph{who is likely to churn?}
-    \item Uplift or experiment design answers: \emph{who changes behaviour because of an offer?}
-    \item Operational policy answers: \emph{which action is viable and fair?}
-  \end{itemize}
 \end{frame}
 
-\SectionDivider{03}{Close the loop}{A slide deck should end in a decision, a practice task and a durable mental model.}
+% =============================================================================
+% SESSION 05: GENERATIVE AI WITH AMAZON BEDROCK
+% =============================================================================
+\TopicDivider{05}{Enterprise Generative AI}{Amazon Bedrock, Titan dense embeddings, vector retrieval, and RAG.}
 
-\begin{frame}{Key takeaway}
-  \begin{TakeawayBox}{Build the decision boundary before the model boundary}
-    Define the decision timestamp, the intervention and the costs first. Then make features point-in-time correct, train a reproducible pipeline, and evaluate against the future workflow it will serve.
-  \end{TakeawayBox}
+\begin{frame}{Amazon Bedrock Managed Foundation Models}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{.48\textwidth}
+      \AWSServiceCard{Amazon Bedrock}{FOUNDATION MODELS}{Serverless API access to leading models: Claude 3.5 Sonnet, Amazon Titan, Llama 3, and Mistral Large.}{Serverless GenAI}
+    \end{column}
+    \begin{column}{.48\textwidth}
+      \AWSServiceCard{OpenSearch Serverless}{VECTOR ENGINE}{High-dimensional k-NN vector search engine powering Enterprise Knowledge Bases.}{Vector Database}
+    \end{column}
+  \end{columns}
+  \vspace{0.20cm}
+  \begin{ConceptBox}{Enterprise Privacy Guarantee}
+    Amazon Bedrock guarantees zero data retention: customer prompts and generated completions are never used to train foundation models, and all payloads remain encrypted under customer KMS keys.
+  \end{ConceptBox}
 \end{frame}
 
-\begin{frame}{Recap}
-  \begin{enumerate}
-    \item A supervised-learning target is a decision framed at a timestamp.
-    \item Point-in-time feature definitions prevent leakage.
-    \item Pipelines keep preprocessing and model behaviour reproducible.
-    \item An AWS endpoint needs lineage, monitoring and a human policy around it.
-  \end{enumerate}
+\begin{frame}{Retrieval-Augmented Generation (RAG) Architecture}
+  \ArchitectureCard{Enterprise Knowledge Base RAG Architecture}{
+    \begin{tikzpicture}[scale=0.84,every node/.style={transform shape}]
+      \node[upgrad/data] (s3docs) {S3 Documents\\{\scriptsize PDF / Markdown}};
+      \node[upgrad/service,right=0.8cm of s3docs] (embed) {Titan Embeddings\\{\scriptsize 1536-dim Vector}};
+      \node[upgrad/model,right=0.8cm of embed] (vector) {OpenSearch\\{\scriptsize k-NN Index}};
+      \node[upgrad/service,right=0.8cm of vector] (llm) {Claude 3.5 Sonnet\\{\scriptsize Bedrock Runtime}};
+      \node[upgrad/callout,below=0.7cm of embed] (query) {User Query $Q$};
+      \node[upgrad/data,below=0.7cm of llm] (ans) {Grounded Answer};
+
+      \draw[upgrad/flow] (s3docs) -- (embed);
+      \draw[upgrad/flow] (embed) -- (vector);
+      \draw[upgrad/flow] (query) -- (embed);
+      \draw[upgrad/flow] (vector) -- (llm);
+      \draw[upgrad/flow] (query) -| (llm);
+      \draw[upgrad/flow] (llm) -- (ans);
+    \end{tikzpicture}
+  }{Grounding LLMs on enterprise proprietary data eliminates hallucinations and provides auditable citation links.}
 \end{frame}
 
-\begin{frame}[plain]
-  \vfill\centering
-  {\fontsize{26}{31}\selectfont\bfseries\color{UpGradInk}Next: turn the baseline into an experiment.\par}
-  \vspace{.35cm}{\large\color{UpGradSlate}Bring one proposed feature and the timestamp at which it becomes available.\par}
-  \vfill\UpGradWordmark
+\begin{frame}{Vector Similarity Mathematics in High Dimensions}
+  \MathDerivationStep{1}{\mathbf{e}_d = \text{Embed}_{\text{Titan}}(D),\qquad \mathbf{e}_q = \text{Embed}_{\text{Titan}}(Q)}{Dense representation vectors in $\mathbb{R}^{1536}$ with unit-norm normalization}
+  \vspace{0.12cm}
+  \MathDerivationStep{2}{\text{sim}(Q, D) = \cos(\theta) = \frac{\mathbf{e}_q \cdot \mathbf{e}_d}{\|\mathbf{e}_q\|_2 \|\mathbf{e}_d\|_2} = \sum_{k=1}^{1536} e_{q,k} \cdot e_{d,k}}{Inner dot product for $L_2$-normalized vector embeddings}
+  \vspace{0.12cm}
+  \MathDerivationStep{3}{\mathcal{N}_k(Q) = \operatorname{arg\,max}_{D \in \mathcal{D}}^{(k)} \left[ \text{sim}(Q, D) \right]}{Hierarchical Navigable Small World (HNSW) approximate nearest neighbors}
 \end{frame}
 
-\begin{References}
-  \item AWS, \emph{Amazon SageMaker Developer Guide}: model deployment, registry and endpoint concepts.
-  \item scikit-learn, \emph{Pipeline} and \emph{ColumnTransformer} API documentation.
-\end{References}
+\begin{frame}[fragile]{Amazon Bedrock Python SDK: Converse API}
+  \begin{HighlightedCodeBlock}{Python}{6,7,12}
+import boto3
+
+bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
+
+response = bedrock.converse(
+    modelId="anthropic.claude-3-5-sonnet-20240620-v1:0",
+    messages=[{"role": "user", "content": [{"text": "Analyze AWS Glue ETL latency bottlenecks."}]}],
+    inferenceConfig={"maxTokens": 1024, "temperature": 0.2, "topP": 0.9},
+    system=[{"text": "You are a Principal AWS Solutions Architect specializing in Big Data & MLOps."}]
+)
+print(response["output"]["message"]["content"][0]["text"])
+  \end{HighlightedCodeBlock}
+\end{frame}
+
+\begin{frame}{Enterprise GenAI Benchmark Metrics}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSPurple}{200,000}{Token Context}{Claude 3.5 Sonnet window}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSEmerald}{140\,ms}{Time-to-First-Token}{Optimized Titan inference}
+    \end{column}
+    \begin{column}{.31\textwidth}
+      \StatCard{AWSOrange}{0\%}{Data Training Risk}{KMS-encrypted zero retention}
+    \end{column}
+  \end{columns}
+  \vspace{0.20cm}
+  \TakeawayBanner{Cloud Data Science is systems engineering: optimize data locality, automate pipelines, and monitor drift.}
+\end{frame}
 
 \end{document}
